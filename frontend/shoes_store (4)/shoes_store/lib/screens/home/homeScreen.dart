@@ -23,64 +23,58 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-           const SizedBox(height: 35),
-            // custom app bar
-           const CustomAppBar(),
-           const SizedBox(height: 20),
-            // search bar
-           const MySearchBar(),
-           const SizedBox(height: 20),
-            ImageSlider(currentSlide: currentSlider, onChange: (Value) {
-              setState(() {
-              currentSlider = Value;
-              },
-              );
-            },
-            ),
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "Special for You",
-                  style: TextStyle(
-                    fontSize: 25,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                Text(
-                  "See More",
-                  style: TextStyle(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 16,
-                    color: Colors.black54,
-                  ),
-                ),
-              
-              ],
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 35),
+              // custom app bar
+              const CustomAppBar(),
+              const SizedBox(height: 20),
+              // search bar
+              const MySearchBar(),
+              const SizedBox(height: 20),
+              ImageSlider(
+                currentSlide: currentSlider,
+                onChange: (value) {
+                  setState(() {
+                    currentSlider = value;
+                  });
+                },
               ),
-              // item
-              GridView.builder(
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "Special for You",
+                    style: TextStyle(
+                      fontSize: 25,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    "See More",
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 16,
+                      color: Colors.black54,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              // Optimized Grid
+              GridView.count(
                 physics: const NeverScrollableScrollPhysics(),
                 shrinkWrap: true,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                 crossAxisCount: 2,
-                 childAspectRatio: 0.78,
-                 crossAxisSpacing: 20,
-                 mainAxisSpacing: 20,
+                crossAxisCount: 2,
+                childAspectRatio: 0.78,
+                crossAxisSpacing: 20,
+                mainAxisSpacing: 20,
+                children: products.map((product) => ProductCard(product: product)).toList(),
               ),
-                itemCount: products.length,
-                itemBuilder: (context, index) {
-                return ProductCard(
-                  product: products[index],
-                  );
-              })
-          ],
+            ],
           ),
-          ),
+        ),
       ),
     );
   }
 }
-

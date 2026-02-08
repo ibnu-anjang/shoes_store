@@ -46,11 +46,7 @@ class _CartScreenState extends State<CartScreen> {
                     padding: const EdgeInsets.all(15),
                   ),
                   onPressed: (){
-                    Navigator.push(
-                      context, MaterialPageRoute(
-                        builder: (context)=> const BottomNavBar(),
-                        ),
-                        );
+                    Navigator.pop(context);
                   },
                   icon: const Icon(Icons.arrow_back_ios)
               ),

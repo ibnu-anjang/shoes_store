@@ -24,15 +24,9 @@ class ImageSlider extends StatelessWidget {
               onPageChanged: onChange,
               physics: const ClampingScrollPhysics(),
               children: [
-                Image.asset("images/slider.jpg",
-                fit: BoxFit.cover,
-                ),
-                Image.asset("images/slider2.png",
-                fit: BoxFit.cover,
-                ),
-                Image.asset("images/slider3.png",
-                fit: BoxFit.cover,
-                ),
+                Container(color: Colors.blue),
+                Container(color: Colors.red),
+                Container(color: Colors.green),
               ],
             ),
           ),
@@ -44,9 +38,9 @@ class ImageSlider extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
-                5,
+                3, // PageView has only 3 children
                 (index) => AnimatedContainer(
-                  duration: const Duration(microseconds: 300),
+                  duration: const Duration(milliseconds: 300), // milliseconds instead of microseconds
                   width: currentSlide == index ? 15 : 8,
                   height: 8,
                   margin: const EdgeInsets.only(right: 3),

@@ -21,7 +21,9 @@ class ProductCard extends StatelessWidget {
             ),
             );
       },
-      child: Stack(
+      child: Material(
+        color: Colors.transparent,
+        child: Stack(
         children: [
           Container(
             width: double.infinity,
@@ -32,21 +34,22 @@ class ProductCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(
+                const SizedBox(
                   height: 5,
                 ),
                 Center(
-                  child: Hero(
-                    tag: product.image,
-                    child: Image.asset(
-                      product.image,
-                      width: 150,
-                      height: 150,
-                      fit: BoxFit.cover,
-                      ),
-                  ),
+                  child: // Hero(
+                    // tag: '${product.title}_${product.image}_${product.price}',
+                    // child: Image.asset(
+                    //   product.image,
+                    //   width: 150,
+                    //   height: 150,
+                    //   fit: BoxFit.cover,
+                    //   ),
+                  // ),
+                  const Icon(Icons.shopping_bag, size: 100, color: Colors.grey),
                 ),
-                SizedBox(height: 10,),
+                const SizedBox(height: 10,),
                 Padding(padding: const EdgeInsets.only(left: 10),
                 child: Text(
                   product.title,
@@ -116,6 +119,7 @@ class ProductCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

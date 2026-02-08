@@ -25,6 +25,11 @@ class UserCreate(BaseModel):
     password: str  # Password asli dari user
 
 
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+
 class UserResponse(BaseModel):
     id: int
     username: str

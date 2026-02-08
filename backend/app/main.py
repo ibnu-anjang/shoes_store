@@ -88,6 +88,30 @@ def login_for_access_token(
         "token_type": "bearer"
     }
 
+
+# Endpoint Login menggunakan JSON
+@app.post("/login")
+def login_with_json(
+    user_data: schemas.UserLogin,
+    db: Session = Depends(database.get_db)
+):
+    # 1. Cari usernya di database
+    user = db.query(models.User).filter(
+        models.User.username == user_data.username).first()
+
+    # 2. Cek username & password
+    if not user or not pwd_context.verify(user_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=400, detail="Username atau password salah, Cuy!")
+
+    # 3. Kirim Token
+    return {
+        "access_token": f"token-rahasia-{user.username}",
+        "token_type": "bearer",
+        "username": user.username,
+        "email": user.email
+    }
+
 # Register User Baru
 
 
@@ -99,22 +123,31 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_d
             status_code=400, detail="Password kepanjangan, maksimal 72 karakter!")
 
     # 1. Cek apakah email sudah terdaftar
-    db_user = db.query(models.User).filter(
-        models.User.email == user.email).first()
-    if db_user:
+    if db.query(models.User).filter(models.User.email == user.email).first():
         raise HTTPException(
             status_code=400, detail="Email sudah dipakai, cari lain!")
+            
+    # 2. Cek apakah username sudah terdaftar
+    if db.query(models.User).filter(models.User.username == user.username).first():
+        raise HTTPException(
+            status_code=400, detail="Username sudah ada yang punya, pilih lain!")
 
-    # 2. Acak password
+    # 3. Acak password
     hashed_pwd = pwd_context.hash(user.password)
 
-    # 3. Simpan
-    new_user = models.User(
-        username=user.username,
-        email=user.email,
-        hashed_password=hashed_pwd
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    return new_user
+    # 4. Simpan dengan pengamanan try-except
+    try:
+        new_user = models.User(
+            username=user.username,
+            email=user.email,
+            hashed_password=hashed_pwd
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        return new_user
+    except Exception as e:
+        db.rollback()
+        print(f"DATABASE ERROR: {e}")
+        raise HTTPException(
+            status_code=500, detail="Gagal menyimpan ke database. Coba lagi nanti.")

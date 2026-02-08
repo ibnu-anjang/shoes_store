@@ -3,7 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shoes_store/provider/cartProvider.dart';
 import 'package:shoes_store/provider/favoriteProvider.dart';
 import 'package:shoes_store/screens/navBar.dart';
+import 'package:shoes_store/screens/auth/login_screen.dart';
 import 'package:provider/provider.dart';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
   runApp(const MyApp());
@@ -23,11 +26,12 @@ class MyApp extends StatelessWidget {
       ),
     ],
   child: MaterialApp(
+    navigatorKey: navigatorKey,
     debugShowCheckedModeBanner: false,
     theme: ThemeData(
-      textTheme: GoogleFonts.mulishTextTheme(),
+      // textTheme: GoogleFonts.mulishTextTheme(),
     ),
-    home: const BottomNavBar(),
+    home: const LoginScreen(),
   ),
   );
 } 
