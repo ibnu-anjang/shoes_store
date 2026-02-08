@@ -1,0 +1,7 @@
+backend/venv/
+**/__pycache__/
+**/*.pyc
+*.rar
+frontend/1shoes_store/
+**/build/
+**/.dart_tool/
