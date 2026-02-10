@@ -104,14 +104,14 @@ class Profile extends StatelessWidget {
                             ),
                             const SizedBox(height: 10),
                             const Text(
-                              "Winnie Vasquez",
+                              "shoes store",
                               style: TextStyle(
                                 fontWeight: FontWeight.w800,
                                 fontSize: 35,
                               ),
                             ),
                             const Text(
-                              "Flutter Developer",
+                              "shoes distributor",
                               style: TextStyle(
                                   fontWeight: FontWeight.w800,
                                   fontSize: 16,
@@ -121,7 +121,7 @@ class Profile extends StatelessWidget {
                               height: 15,
                             ),
                             const Text(
-                              "A Flutter developer is a software engineer who has proficiency with the Flutter framework to develop mobile, web,",
+                              "mqwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww",
                               style: TextStyle(
                                 fontSize: 16,
                               ),
