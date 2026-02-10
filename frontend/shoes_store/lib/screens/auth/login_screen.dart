@@ -43,6 +43,9 @@ class _LoginScreenState extends State<LoginScreen> {
       if (result.containsKey('access_token')) {
         print('DEBUG: Login Success.');
         
+        // Save token for persistent login
+        await AuthService.saveToken(result['access_token']);
+        
         if (mounted) setState(() => _isLoading = false);
         
         // Navigation Global Fix: Use the state-less navigator to avoid context deadlocks

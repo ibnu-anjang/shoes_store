@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shoes_store/screens/auth/login_screen.dart';
+import '../services/auth_service.dart';
 
 class BottomNavBar extends StatefulWidget {
   const BottomNavBar({super.key});
@@ -27,11 +28,16 @@ class _BottomNavBarState extends State<BottomNavBar> {
         title: const Text("Shoes Store - Debug Mode"),
         actions: [
           IconButton(
-            onPressed: () {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-                (route) => false,
-              );
+            onPressed: () async {
+              // Clear token for logout
+              await AuthService.clearToken();
+              
+              if (mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                  (route) => false,
+                );
+              }
             },
             icon: const Icon(Icons.logout),
           ),

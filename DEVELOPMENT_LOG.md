@@ -25,12 +25,23 @@ Dokumen ini berisi rangkuman seluruh perbaikan, fitur, dan catatan teknis yang d
 
 ## ✨ Fitur & Peningkatan Baru
 - **Friendly Notifications**: Pesan error login/register sekarang berbahasa Indonesia santai ("Waduh!", "Cuy!", "Username kepake nih!").
-- **Logout System**: Menambahkan tombol logout di AppBar yang membersihkan seluruh tumpukan halaman (clear route stack).
-- **Isolation Debugging**: Menyiapkan struktur NavBar yang lebih stabil meskipun nantinya akan ditambah aset berat lagi.
+- **Logout System**: Menambahkan tombol logout di AppBar yang membersihkan seluruh tumpukan halaman dan membuang token session.
+- **Persistent Login (Auto-Login)**: Menggunakan `shared_preferences` untuk menyimpan token. Aplikasi akan langsung masuk ke Home jika user sudah login sebelumnya (Anti-Freeze implementation).
+- **Offline Support & Stability**: 
+  - Penambahan **Request Timeout** (7 detik) agar aplikasi tidak hang jika server mati.
+  - **Product Caching**: Data produk disimpan otomatis di memori HP untuk dibuka saat offline.
+  - **Offline Indicator**: Banner oranye muncul jika aplikasi menggunakan data simpanan (cache).
+
+---
+
+## 🛠️ Pemeliharaan Struktur (Project Cleanup)
+- **Ghost Folder Removal**: Menghapus folder `frontend/lib` yang duplikat dan di luar root `shoes_store` untuk menghilangkan 1000+ error kompilasi.
+- **VS Code Fix**: Memperbaiki `launch.json` agar mengarah ke folder project yang benar.
 
 ---
 
 ## 🌐 Rencana Presentasi (Localtunnel)
+... (konten selanjutnya tetap sama)
 Untuk mendemonstrasikan aplikasi ini tanpa perlu mengganti IP manual di kode:
 1. **Jalankan Backend**: `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
 2. **Jalankan Localtunnel**: Di terminal baru, gunakan `lt --port 8000 --subdomain shoes-store-api`

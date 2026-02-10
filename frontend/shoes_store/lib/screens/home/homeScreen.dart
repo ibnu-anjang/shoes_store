@@ -6,6 +6,8 @@ import 'package:shoes_store/screens/home/widget/searchBar.dart';
 
 import 'widget/homeAppBar.dart';
 
+import 'package:shoes_store/services/product_service.dart';
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -15,6 +17,25 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int currentSlider = 0;
+  List<Product> displayedProducts = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    final results = await ProductService.getProducts();
+    if (mounted) {
+      setState(() {
+        displayedProducts = results;
+        isLoading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -31,6 +52,30 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 20),
               // search bar
               const MySearchBar(),
+              
+              // Offline Indicator Banner
+              if (!isLoading && ProductService.isOfflineData)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.symmetric(vertical: 10),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade100,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.cloud_off, color: Colors.orange),
+                      SizedBox(width: 8),
+                      Text(
+                        "Mode Offline: Menampilkan data simpanan",
+                        style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+
               const SizedBox(height: 20),
               ImageSlider(
                 currentSlide: currentSlider,
@@ -62,15 +107,20 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 10),
               // Optimized Grid
-              GridView.count(
-                physics: const NeverScrollableScrollPhysics(),
-                shrinkWrap: true,
-                crossAxisCount: 2,
-                childAspectRatio: 0.78,
-                crossAxisSpacing: 20,
-                mainAxisSpacing: 20,
-                children: products.map((product) => ProductCard(product: product)).toList(),
-              ),
+              isLoading 
+                ? const Center(child: Padding(
+                    padding: EdgeInsets.all(50.0),
+                    child: CircularProgressIndicator(),
+                  ))
+                : GridView.count(
+                    physics: const NeverScrollableScrollPhysics(),
+                    shrinkWrap: true,
+                    crossAxisCount: 2,
+                    childAspectRatio: 0.78,
+                    crossAxisSpacing: 20,
+                    mainAxisSpacing: 20,
+                    children: displayedProducts.map((product) => ProductCard(product: product)).toList(),
+                  ),
             ],
           ),
         ),

@@ -12,8 +12,8 @@ class Product {
   final double rate;
   int quantity;
 
-  Product(
-    {required this.title,
+  Product({
+    required this.title,
     required this.review,
     required this.description,
     required this.image,
@@ -22,7 +22,31 @@ class Product {
     required this.seller,
     required this.category,
     required this.rate,
-    required this.quantity});
+    required this.quantity,
+  });
+
+  // Convert JSON from Backend to Product Object
+  factory Product.fromJson(Map<String, dynamic> json) {
+    return Product(
+      title: json['name'] ?? '',
+      description: json['description'] ?? '',
+      image: "images/shoe1.png", // Placeholder because backend doesn't have images yet
+      review: "4.0 (0 reviews)", // Placeholder
+      seller: "Store",           // Placeholder
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      colors: [Colors.black],    // Placeholder
+      category: "Shoes",         // Placeholder
+      rate: 4.0,                 // Placeholder
+      quantity: 1,
+    );
+  }
+
+  // Convert Product Object to JSON for Caching
+  Map<String, dynamic> toJson() => {
+        'name': title,
+        'description': description,
+        'price': price,
+      };
 }
 
 final List<Product> products = [
