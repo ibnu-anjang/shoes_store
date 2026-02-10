@@ -1,0 +1,29 @@
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+**/android/**/build/
+**/ios/.generated/
+**/*.jks
+**/*.keystore
+
+# Python/FastAPI
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.env
+.venv
+.vscode/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*.DS_Store
