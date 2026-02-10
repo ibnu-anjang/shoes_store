@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shoes_store/screens/auth/login_screen.dart';
+import 'package:shoes_store/screens/cart/cartScreen.dart';
+import 'package:shoes_store/screens/favorite/favorite.dart';
+import 'package:shoes_store/screens/home/homeScreen.dart';
+import 'package:shoes_store/screens/profile/profile.dart';
 import '../services/auth_service.dart';
 
 class BottomNavBar extends StatefulWidget {
@@ -10,16 +14,17 @@ class BottomNavBar extends StatefulWidget {
 }
 
 class _BottomNavBarState extends State<BottomNavBar> {
-  int currentIndex = 2;
+  int currentIndex = 0;
   
   // ABSOLUTELY NO EXTERNAL WIDGETS HERE
   final List<Widget> screens = [
-    const Scaffold(body: Center(child: Text("TAB: HOME"))),
-    const Scaffold(body: Center(child: Text("TAB: FAVORITE"))),
-    const Scaffold(body: Center(child: Text("TAB: MAIN"))),
-    const Scaffold(body: Center(child: Text("TAB: CART"))),
-    const Scaffold(body: Center(child: Text("TAB: PROFILE"))),
-  ];
+  const HomeScreen(),
+  const Favorite(),
+  const Center(child: Text("TAB: MAIN")),
+  const CartScreen(),
+  const Profile(),
+];
+
 
   @override
   Widget build(BuildContext context) {
@@ -49,9 +54,9 @@ class _BottomNavBarState extends State<BottomNavBar> {
         onTap: (value) => setState(() => currentIndex = value),
         type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.grid_view), label: "Home"),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
           BottomNavigationBarItem(icon: Icon(Icons.favorite), label: "Favorite"),
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Main"),
+          BottomNavigationBarItem(icon: Icon(Icons.smart_toy), label: "ChatBot"),
           BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: "Cart"),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
         ],
