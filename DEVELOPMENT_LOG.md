@@ -32,7 +32,7 @@ Dokumen ini berisi rangkuman seluruh perbaikan, fitur, dan catatan teknis yang d
 
 ## 🌐 Rencana Presentasi (Localtunnel)
 Untuk mendemonstrasikan aplikasi ini tanpa perlu mengganti IP manual di kode:
-1. **Jalankan Backend**: `uvicorn app.main:app --reload --port 8000`
+1. **Jalankan Backend**: `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
 2. **Jalankan Localtunnel**: Di terminal baru, gunakan `lt --port 8000 --subdomain shoes-store-api`
 3. **Update URL**: Ganti `baseUrl` di `auth_service.dart` dengan URL dari localtunnel (misal: `https://shoes-store-api.loca.lt`).
 4. **Keuntungan**: Aplikasi Flutter di HP asli bisa langsung akses server Anda melalui internet tanpa harus dalam 1 WiFi.
@@ -50,6 +50,23 @@ Untuk mendemonstrasikan aplikasi ini tanpa perlu mengganti IP manual di kode:
 1. **Validasi Server-Side**: Jangan pernah percaya input dari user. Selalu validasi ulang semua data (panjang password, keunikan username) di backend.
 2. **Database Rollback**: Jika proses `db.commit()` gagal, pastikan lakukan `db.rollback()` agar sesi database tidak nyangkut.
 3. **API Documentation**: Manfaatkan fitur `/docs` (Swagger) FastAPI untuk mengetes endpoint sebelum dihubungkan ke Flutter.
+
+---
+
+## 🚀 Rencana Selanjutnya (PR / Future Tasks)
+
+Berdasarkan instruksi terakhir, berikut adalah fitur yang akan diimplementasikan pada tahap berikutnya:
+
+1. **Persistent Login (Auto-Login)**:
+   - Menggunakan `shared_preferences` untuk menyimpan token secara lokal.
+   - Saat aplikasi dibuka, sistem akan mengecek keberadaan token; jika ada, user langsung masuk ke `BottomNavBar` tanpa melewati `LoginScreen`.
+
+2. **Offline Support & Stability**:
+   - Menghindari crash saat tidak ada koneksi internet.
+   - Implementasi caching sederhana (menyimpan data produk terakhir yang berhasil dimuat) agar aplikasi tetap menampilkan informasi saat offline (mode read-only).
+
+3. **Restorasi UI Penuh**:
+   - Mengembalikan aset gambar dan font satu per satu setelah stabilitas auto-login terverifikasi.
 
 ---
 *Dibuat oleh AI Assistant (Antigravity).*
