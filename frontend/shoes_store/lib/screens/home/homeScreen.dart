@@ -4,7 +4,6 @@ import 'package:shoes_store/screens/home/widget/imageSlider.dart';
 import 'package:shoes_store/screens/home/widget/productCart.dart';
 import 'package:shoes_store/screens/home/widget/searchBar.dart';
 
-import 'widget/homeAppBar.dart';
 
 import 'package:shoes_store/services/product_service.dart';
 
@@ -47,10 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 35),
-              // custom app bar
-              const CustomAppBar(),
-              const SizedBox(height: 20),
+              const SizedBox(height: 10),
               // search bar
               const MySearchBar(),
               
@@ -94,14 +90,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(
                       fontSize: 25,
                       fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  Text(
-                    "See More",
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 16,
-                      color: Colors.black54,
                     ),
                   ),
                 ],

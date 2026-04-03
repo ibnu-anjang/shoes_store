@@ -5,6 +5,7 @@ import 'package:shoes_store/screens/favorite/favorite.dart';
 import 'package:shoes_store/screens/home/homeScreen.dart';
 import 'package:shoes_store/screens/profile/profile.dart';
 import '../services/auth_service.dart';
+import 'chatbot/chatBotScreen.dart';
 
 class BottomNavBar extends StatefulWidget {
   const BottomNavBar({super.key});
@@ -20,7 +21,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
   final List<Widget> screens = [
   const HomeScreen(),
   const Favorite(),
-  const Center(child: Text("TAB: MAIN")),
+  const ChatbotScreen(),
   const CartScreen(),
   const Profile(),
 ];
