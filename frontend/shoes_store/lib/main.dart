@@ -16,7 +16,7 @@ Future<void> main() async {
   // Check for existing token
   final String? token = await AuthService.getToken();
   
-  runApp(MyApp(initialHome: token != null ? const BottomNavBar() : const LoginScreen()));
+  runApp(MyApp(initialHome: const BottomNavBar(),));
 }
 
 class MyApp extends StatelessWidget {

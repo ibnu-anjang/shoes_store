@@ -10,24 +10,26 @@ class Profile extends StatelessWidget {
       body: Stack(
         children: [
           Image.asset(
-            "images/profile3.png",
+            "assets/pp.png",
             fit: BoxFit.cover,
             height: size.height,
             width: size.width,
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 50), 
             child: Align(
-              alignment: Alignment.bottomCenter,
+              alignment: Alignment.topCenter, 
               child: Card(
+                elevation: 5,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: Container(
-                  height: size.height * 0.4,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 15),
+
+                  width: double.infinity, 
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 15),
                   child: Column(
+                    mainAxisSize: MainAxisSize.min, 
                     children: [
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 15),
@@ -41,8 +43,7 @@ class Profile extends StatelessWidget {
                                   children: [
                                     const CircleAvatar(
                                       radius: 42,
-                                      backgroundImage:
-                                          AssetImage("images/profile3.png"),
+                                      backgroundImage: AssetImage("assets/pp.png"),
                                     ),
                                     Positioned(
                                       bottom: 0,
@@ -52,8 +53,7 @@ class Profile extends StatelessWidget {
                                         width: 25,
                                         decoration: const BoxDecoration(
                                           shape: BoxShape.circle,
-                                          color:
-                                              Color.fromARGB(255, 95, 225, 99),
+                                          color: Color.fromARGB(255, 95, 225, 99),
                                         ),
                                         child: const Icon(
                                           Icons.check,
@@ -66,38 +66,9 @@ class Profile extends StatelessWidget {
                                 ),
                                 Row(
                                   children: [
-                                    Container(
-                                      decoration: BoxDecoration(
-                                          borderRadius:
-                                              BorderRadius.circular(20),
-                                          border: Border.all(
-                                              color: Colors.black54)),
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 9, horizontal: 12),
-                                      child: const Text(
-                                        "ADD FRIEND",
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 15),
-                                      ),
-                                    ),
+                                    _buildButton("ADD FRIEND", Colors.transparent, Colors.black),
                                     const SizedBox(width: 8),
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(20),
-                                        color: Colors.pink,
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 8, horizontal: 12),
-                                      child: const Text(
-                                        "Follow",
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    )
+                                    _buildButton("Follow", Colors.pink, Colors.white),
                                   ],
                                 )
                               ],
@@ -105,10 +76,7 @@ class Profile extends StatelessWidget {
                             const SizedBox(height: 10),
                             const Text(
                               "shoes store",
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 35,
-                              ),
+                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 35),
                             ),
                             const Text(
                               "shoes distributor",
@@ -117,22 +85,16 @@ class Profile extends StatelessWidget {
                                   fontSize: 16,
                                   color: Colors.black45),
                             ),
-                            const SizedBox(
-                              height: 15,
-                            ),
+                            const SizedBox(height: 15),
                             const Text(
                               "mqwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww",
-                              style: TextStyle(
-                                fontSize: 16,
-                              ),
+                              style: TextStyle(fontSize: 16),
                             ),
                           ],
                         ),
                       ),
-                      const Spacer(),
-                      const Divider(
-                        color: Colors.black12,
-                      ),
+                      const SizedBox(height: 20), 
+                      const Divider(color: Colors.black12),
                       SizedBox(
                         height: 65,
                         child: Row(
@@ -154,7 +116,24 @@ class Profile extends StatelessWidget {
       ),
     );
   }
-
+  Widget _buildButton(String label, Color bgColor, Color textColor) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: bgColor,
+        border: bgColor == Colors.transparent ? Border.all(color: Colors.black54) : null,
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 15,
+          color: textColor,
+        ),
+      ),
+    );
+  }
   SizedBox friendAndMore(title, number) {
     return SizedBox(
       width: 110,
@@ -162,18 +141,11 @@ class Profile extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.black26),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black26),
           ),
           Text(
             number,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 25,
-              color: Colors.black,
-            ),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 25, color: Colors.black),
           )
         ],
       ),

@@ -79,13 +79,13 @@ class ItemDetails extends StatelessWidget {
               TextSpan(
                 children: [
                   const TextSpan(
-                    text: "Seller: ",
+                    text: "type: ",
                     style: TextStyle(
                       fontSize: 16,
                     ),
                   ),
                   TextSpan(
-                    text: product.seller,
+                    text: product.type,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
