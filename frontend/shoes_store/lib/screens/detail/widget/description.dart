@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:shoes_store/constant.dart';
+import 'package:shoes_store/provider/reviewProvider.dart';
 
 class Description extends StatefulWidget {
+  final String productId; // Ditambahkan untuk filter review
   final String description;
   final String specification;
-  final String review;
+  final double initialRate; // Untuk perhitungan akumulasi
 
   const Description({
     super.key,
+    required this.productId,
     required this.description,
     required this.specification,
-    required this.review,
+    required this.initialRate,
   });
 
   @override
@@ -20,11 +23,12 @@ class Description extends StatefulWidget {
 class _DescriptionState extends State<Description> {
   int selectedIndex = 0;
 
-  final TextEditingController reviewController = TextEditingController();
-  final List<String> userReviews = [];
-
   @override
   Widget build(BuildContext context) {
+    final reviewProvider = ReviewProvider.of(context);
+    final localReviews = reviewProvider.getProductReviews(widget.productId);
+    final avgRating = reviewProvider.getAverageRating(widget.productId, widget.initialRate);
+
     List<String> tabs = ["Description", "Specification", "Review"];
 
     Widget content;
@@ -32,54 +36,75 @@ class _DescriptionState extends State<Description> {
     if (selectedIndex == 0) {
       content = Text(
         widget.description,
-        style: const TextStyle(fontSize: 16, color: Colors.grey),
+        style: const TextStyle(fontSize: 14, color: Colors.grey, height: 1.5),
       );
     } else if (selectedIndex == 1) {
       content = Text(
         widget.specification,
-        style: const TextStyle(fontSize: 16, color: Colors.grey),
+        style: const TextStyle(fontSize: 14, color: Colors.grey, height: 1.5),
       );
     } else {
-      /// 🔥 REVIEW UI
+      /// 🔥 REAL REVIEW UI
       content = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
-          /// LIST REVIEW
-          ...userReviews.map((e) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text("• $e"),
-              )),
-
-          const SizedBox(height: 10),
-
-          /// INPUT REVIEW
-          TextField(
-            controller: reviewController,
-            decoration: InputDecoration(
-              hintText: "Tulis review...",
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(15),
+          Row(
+            children: [
+              const Icon(Icons.star, color: Colors.amber, size: 24),
+              const SizedBox(width: 8),
+              Text(
+                "${avgRating.toStringAsFixed(1)} / 5.0",
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
-            ),
+              const SizedBox(width: 8),
+              Text(
+                "(${5 + localReviews.length} Reviews)",
+                style: const TextStyle(color: Colors.grey),
+              ),
+            ],
           ),
-
-          const SizedBox(height: 10),
-
-          ElevatedButton(
-            onPressed: () {
-              if (reviewController.text.isNotEmpty) {
-                setState(() {
-                  userReviews.add(reviewController.text);
-                  reviewController.clear();
-                });
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kprimaryColor,
-            ),
-            child: const Text("Kirim Review"),
-          ),
+          const SizedBox(height: 20),
+          
+          if (localReviews.isEmpty)
+             const Center(
+               child: Padding(
+                 padding: EdgeInsets.symmetric(vertical: 20),
+                 child: Text("Belum ada review tambahan dari pembeli.", style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
+               ),
+             )
+          else
+            ...localReviews.map((review) => Container(
+                  margin: const EdgeInsets.only(bottom: 15),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: kcontentColor,
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(review.userName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          Text(
+                            "${review.date.day}/${review.date.month}/${review.date.year}",
+                            style: const TextStyle(color: Colors.grey, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: List.generate(5, (index) => Icon(
+                          Icons.star, 
+                          size: 14, 
+                          color: index < review.rating ? Colors.amber : Colors.grey.shade300
+                        )),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(review.comment, style: const TextStyle(fontSize: 13)),
+                    ],
+                  ),
+                )),
         ],
       );
     }
@@ -87,7 +112,6 @@ class _DescriptionState extends State<Description> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-
         /// 🔥 TAB + SLIDING BACKGROUND
         LayoutBuilder(
           builder: (context, constraints) {
@@ -95,7 +119,6 @@ class _DescriptionState extends State<Description> {
 
             return Stack(
               children: [
-
                 /// BACKGROUND ORANGE (GESER)
                 AnimatedPositioned(
                   duration: const Duration(milliseconds: 300),
@@ -148,7 +171,8 @@ class _DescriptionState extends State<Description> {
         /// 🔥 CONTENT (ANIMASI)
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
-          child: Container(
+          child: SizedBox( // Menggunakan SizedBox untuk tinggi yang lebih fleksibel
+            width: double.infinity,
             key: ValueKey(selectedIndex),
             child: content,
           ),

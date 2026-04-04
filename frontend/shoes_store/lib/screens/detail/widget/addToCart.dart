@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:shoes_store/constant.dart';
+import 'package:shoes_store/models/cartItem.dart';
 import 'package:shoes_store/models/productModel.dart';
 import 'package:shoes_store/provider/cartProvider.dart';
+import 'package:shoes_store/screens/cart/checkoutScreen.dart';
 
 class AddToCart extends StatefulWidget {
   final Product product;
-  const AddToCart({super.key, required this.product});
+  final String selectedSize;
+  final Color selectedColor;
+  const AddToCart({
+    super.key,
+    required this.product,
+    required this.selectedSize,
+    required this.selectedColor,
+  });
 
   @override
   State<AddToCart> createState() => _AddToCartState();
@@ -21,7 +30,6 @@ class _AddToCartState extends State<AddToCart> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
       child: Container(
-        // MENGHAPUS height: 85 agar fleksibel
         padding: const EdgeInsets.all(12), 
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(50),
@@ -29,17 +37,17 @@ class _AddToCartState extends State<AddToCart> {
         ),
         child: Row(
           children: [
-            // BAGIAN KIRI: Counter
+            // COUNTER
             Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white, width: 1.5),
+                border: Border.all(color: Colors.white.withOpacity(0.5), width: 1),
               ),
               child: Row(
-                mainAxisSize: MainAxisSize.min, // Agar Row counter tidak serakah tempat
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    constraints: const BoxConstraints(), // Menghilangkan padding bawaan iconbutton
+                    constraints: const BoxConstraints(),
                     onPressed: () {
                       if (currentIndex != 1) {
                         setState(() {
@@ -49,7 +57,6 @@ class _AddToCartState extends State<AddToCart> {
                     },
                     icon: const Icon(Icons.remove, color: Colors.white, size: 20),
                   ),
-                  const SizedBox(width: 4),
                   Text(
                     currentIndex.toString(),
                     style: const TextStyle(
@@ -57,7 +64,6 @@ class _AddToCartState extends State<AddToCart> {
                       color: Colors.white,
                     ),
                   ),
-                  const SizedBox(width: 4),
                   IconButton(
                     constraints: const BoxConstraints(),
                     onPressed: () {
@@ -71,36 +77,82 @@ class _AddToCartState extends State<AddToCart> {
               ),
             ),
 
-            const SizedBox(width: 10), // Jarak antar widget
+            const SizedBox(width: 8),
 
-            // BAGIAN KANAN: Tombol Add to Cart
-            Expanded( 
-              child: GestureDetector(
-                onTap: () {
-                  provider.toggleFavorite(widget.product);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("Successfully added", style: TextStyle(fontWeight: FontWeight.bold)),
-                      duration: Duration(seconds: 1),
+            // BUTTONS
+            Expanded(
+              child: Row(
+                children: [
+                  // Add to Cart
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        provider.addToCart(
+                          widget.product,
+                          widget.selectedSize,
+                          widget.selectedColor,
+                          currentIndex,
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("Ditambahkan ke Keranjang!", style: TextStyle(fontWeight: FontWeight.bold)),
+                            duration: Duration(seconds: 1),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      },
+                      child: Container(
+                        height: 45,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(50),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Text(
+                          "Cart",
+                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     ),
-                  );
-                },
-                child: Container(
-                  height: 50, // Tinggi tombol diperkecil sedikit agar pas
-                  decoration: BoxDecoration(
-                    color: kprimaryColor,
-                    borderRadius: BorderRadius.circular(50),
                   ),
-                  alignment: Alignment.center,
-                  child: const Text(
-                    "Add to Cart",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16, // Font diperkecil sedikit untuk layar sempit
+                  const SizedBox(width: 8),
+                  // Beli Sekarang (Direct to Checkout - Shopee Style)
+                  Expanded(
+                    flex: 2,
+                    child: GestureDetector(
+                      onTap: () {
+                        final buyNowItem = CartItem(
+                          product: widget.product,
+                          selectedSize: widget.selectedSize,
+                          selectedColor: widget.selectedColor,
+                          quantity: currentIndex,
+                        );
+                        
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CheckoutScreen(
+                              items: [buyNowItem],
+                              isBuyNow: true,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        height: 45,
+                        decoration: BoxDecoration(
+                          color: kprimaryColor,
+                          borderRadius: BorderRadius.circular(50),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Text(
+                          "Beli Sekarang",
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
             ),
           ],

@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  db:
+    image: mariadb:10.11
+    container_name: shoes_store_db
+    restart: always
+    environment:
+      # Mengizinkan login root tanpa password (sesuai settingan di database.py)
+      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: 'yes'
+      # Otomatis membuat database saat pertama kali jalan
+      MARIADB_DATABASE: 'db_shoes_store'
+    ports:
+      # Port mapping: host_port:container_port
+      - '3306:3306'
+    volumes:
+      # Menyimpan data database agar tidak hilang saat container dimatikan
+      - mariadb_data:/var/lib/mysql
+
+  app:
+    build: ./backend
+    container_name: my_uvicorn_app
+    expose:
+      - "8000"
+    ports:
+      - "8000:8000"
+    restart: always
+
+  # Service 2: Cloudflare Tunnel
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared_connector
+    restart: always
+    # GANTI KODE DI BAWAH DENGAN TOKEN ASLI DARI DASHBOARD
+    command: tunnel --no-autoupdate run --token eyJhIjoiZDdjNDk2ZjlmOTEyODk5N2ZjOWYzNDI5Mzg2MWM0MzUiLCJ0IjoiYWUyMDQ1YmEtYjRmZS00YjQwLWEyYjktYzhlZDI4OGM4Y2Y5IiwicyI6Ik1XUTVOemxrT1RndE1ETTBNeTAwTmpGa0xUaGxZVGt0TldKbFpURTFObVE1TW1JMCJ9
+    depends_on:
+      - app
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: shoes_store_pma
+    restart: always
+    ports:
+      - '8080:80'
+    environment:
+      PMA_HOST: db
+      PMA_USER: root
+      PMA_PASSWORD: ''
+    depends_on:
+      - db
+
+volumes:
+  mariadb_data:

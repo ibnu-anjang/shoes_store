@@ -25,7 +25,13 @@ class _DetailScreenState extends State<DetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kcontentColor,
-      floatingActionButton: AddToCart(product: widget.product),
+      floatingActionButton: AddToCart(
+        product: widget.product,
+        selectedSize: sizes[currentSize],
+        selectedColor: widget.product.colors.isNotEmpty
+            ? widget.product.colors[currentColor < widget.product.colors.length ? currentColor : 0]
+            : Colors.black,
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       body: SafeArea(
         child: Column(
@@ -186,11 +192,12 @@ class _DetailScreenState extends State<DetailScreen> {
 
                           const SizedBox(height: 25),
 
-                          Description(
-                            description: widget.product.description,
-                            specification: widget.product.specification,
-                            review: widget.product.review,
-                          ),
+                           Description(
+                             productId: widget.product.title,
+                             description: widget.product.description,
+                             specification: widget.product.specification,
+                             initialRate: widget.product.rate,
+                           ),
                         ],
                       ),
                     ),

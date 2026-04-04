@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:shoes_store/constant.dart';
 
 class MySearchBar extends StatelessWidget {
-  const MySearchBar({super.key});
+  final Function(String)? onChanged;
+  final VoidCallback? onFilterTap;
+  const MySearchBar({super.key, this.onChanged, this.onFilterTap});
 
   @override
   Widget build(BuildContext context) {
@@ -22,10 +24,11 @@ class MySearchBar extends StatelessWidget {
             size: 30,
           ),
           const SizedBox(width: 10,),
-          const Flexible(
+          Flexible(
             flex: 4,
             child: TextField(
-              decoration: InputDecoration(hintText: "Search...",
+              onChanged: onChanged,
+              decoration: const InputDecoration(hintText: "Search...",
               border: InputBorder.none,),
             ),
           ),
@@ -34,7 +37,7 @@ class MySearchBar extends StatelessWidget {
             width: 1.5,
             color: Colors.grey,
           ),
-          IconButton(onPressed: (){}, 
+          IconButton(onPressed: onFilterTap, 
           icon: const Icon(
             Icons.tune,
             color: Colors.grey,))

@@ -36,6 +36,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   http: ^1.1.0
   shared_preferences: ^2.2.2
+  google_fonts: ^6.2.1
+  provider: ^6.1.2
 
 dev_dependencies:
   flutter_test:
@@ -47,8 +49,6 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
-  google_fonts: ^6.2.1
-  provider: ^6.1.2
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -56,23 +56,9 @@ dev_dependencies:
 # The following section is specific to Flutter packages.
 flutter:
   uses-material-design: true
-    assets:
-    - assets/adiduramorun.jpg
-    - assets/adirunblazerun.webp
-    - assets/arkakhakisneak.jpg	
-    - assets/pp.png
-    - assets/ginomarianiederlyflat.webp
-    - assets/ginomarianihollandform.webp
-    - assets/haileysneak.jpg
-    - assets/heavesflat.webp
-    - assets/marelliform.webp
-    - assets/pm172pedroloafer.webp
-    - assets/promo1.jpg
-    - assets/promo2.jpg
-    - assets/promo3.jpg
-    - assets/skechersslip.jpg
-    - assets/vansclassicslip.jpg
-    - assets/wirkenloafer.jpg
+  assets:
+    - assets/
+    - assets/images/
     
 
   # An image asset can refer to one or more resolution-specific "variants", see

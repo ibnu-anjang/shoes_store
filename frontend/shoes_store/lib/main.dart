@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'provider/cartProvider.dart';
 import 'provider/favoriteProvider.dart';
+import 'provider/orderProvider.dart';
+import 'provider/reviewProvider.dart';
 import 'screens/navBar.dart';
 import 'screens/auth/login_screen.dart';
 import 'package:provider/provider.dart';
@@ -13,10 +14,21 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Check for existing token
-  final String? token = await AuthService.getToken();
-  
-  runApp(MyApp(initialHome: const BottomNavBar(),));
+  // Check for existing token (graceful — tidak crash kalau backend mati)
+  Widget initialHome;
+  try {
+    final String? token = await AuthService.getToken();
+    if (token != null && token.isNotEmpty) {
+      initialHome = const BottomNavBar();
+    } else {
+      initialHome = const LoginScreen();
+    }
+  } catch (e) {
+    // Kalau error baca token, langsung ke Login
+    initialHome = const LoginScreen();
+  }
+
+  runApp(MyApp(initialHome: initialHome));
 }
 
 class MyApp extends StatelessWidget {
@@ -31,6 +43,12 @@ class MyApp extends StatelessWidget {
       ),
       ChangeNotifierProvider(
         create: (_) => FavoriteProvider(),
+      ),
+      ChangeNotifierProvider(
+        create: (_) => OrderProvider(),
+      ),
+      ChangeNotifierProvider(
+        create: (_) => ReviewProvider(),
       ),
     ],
   child: MaterialApp(

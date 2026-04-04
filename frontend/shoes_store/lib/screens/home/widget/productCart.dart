@@ -38,16 +38,17 @@ class ProductCard extends StatelessWidget {
                   height: 5,
                 ),
                 Center(
-                  child: // Hero(
-                    // tag: '${product.title}_${product.image}_${product.price}',
-                    // child: Image.asset(
-                    //   product.image,
-                    //   width: 150,
-                    //   height: 150,
-                    //   fit: BoxFit.cover,
-                    //   ),
-                  // ),
-                  const Icon(Icons.shopping_bag, size: 100, color: Colors.grey),
+                  child: Hero(
+                    tag: '${product.title}_${product.image}_${product.price}',
+                    child: Image.asset(
+                      product.image,
+                      width: 150,
+                      height: 150,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Icon(Icons.broken_image, size: 100, color: Colors.grey),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 10,),
                 Padding(padding: const EdgeInsets.only(left: 10),

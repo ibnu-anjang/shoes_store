@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shoes_store/models/productModel.dart';
@@ -10,33 +11,34 @@ class ProductService {
 
   static Future<List<Product>> getProducts() async {
     try {
-      // 1. Attempt to fetch from API with Timeout (Anti-Freeze)
       final response = await http
           .get(Uri.parse('${AuthService.baseUrl}/products'))
           .timeout(const Duration(seconds: 7));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        
-        // 2. Silent Caching: Save to memory in background
-        _cacheData(response.body);
-        
-        isOfflineData = false;
-        return data.map((json) => Product.fromJson(json)).toList();
+        if (data.isNotEmpty) {
+          _cacheData(response.body);
+          isOfflineData = false;
+          debugPrint("DEBUG: Products loaded from API (${data.length})");
+          return data.map((json) => Product.fromJson(json)).toList();
+        }
       }
     } catch (e) {
-      print("DEBUG: Fetch failed, using cache. Error: $e");
+      debugPrint("DEBUG: API Fetch failed ($e), trying cache...");
     }
 
-    // 3. Offline Mode: Load from Cache
     final cached = await _loadCache();
     if (cached != null) {
-      isOfflineData = true;
       final List<dynamic> data = jsonDecode(cached);
-      return data.map((json) => Product.fromJson(json)).toList();
+      if (data.isNotEmpty) {
+        isOfflineData = true;
+        debugPrint("DEBUG: Products loaded from Cache (${data.length})");
+        return data.map((json) => Product.fromJson(json)).toList();
+      }
     }
 
-    // 4. Fallback: If no cache and no internet, use static mock data from productModel.dart
+    debugPrint("DEBUG: No API/Cache found or data empty, using static Fallback data");
     return products;
   }
 

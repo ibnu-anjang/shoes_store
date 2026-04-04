@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shoes_store/constant.dart';
 import 'package:shoes_store/models/productModel.dart';
+import 'package:shoes_store/provider/reviewProvider.dart';
 
 class ItemDetails extends StatelessWidget {
   final Product product;
@@ -8,7 +9,12 @@ class ItemDetails extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final reviewProvider = ReviewProvider.of(context);
+    final localReviews = reviewProvider.getProductReviews(product.title);
+    final avgRating = reviewProvider.getAverageRating(product.title, product.rate);
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           product.title,
@@ -23,13 +29,13 @@ class ItemDetails extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-              "\$${product.price}",
-              style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 25,
+                  "\$${product.price}",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 25,
                   ),
                 ),
-                const SizedBox(width: 10,),
+                const SizedBox(height: 5),
                 // rating
                 Row(
                   children: [
@@ -43,15 +49,16 @@ class ItemDetails extends StatelessWidget {
                       alignment: Alignment.center,
                       padding: const EdgeInsets.symmetric(horizontal: 5),
                       child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const Icon(
                             Icons.star,
                             size: 15,
                             color: Colors.white,
                           ),
-                          const SizedBox(width: 3,),
+                          const SizedBox(width: 3),
                           Text(
-                            product.rate.toString(),
+                            avgRating.toStringAsFixed(1),
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -61,12 +68,12 @@ class ItemDetails extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 5,),
+                    const SizedBox(width: 8),
                     Text(
-                      product.review,
+                      "(${5 + localReviews.length} reviews)",
                       style: const TextStyle(
                         color: Colors.grey,
-                        fontSize: 15,
+                        fontSize: 14,
                       ),
                     )
                   ],

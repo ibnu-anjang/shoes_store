@@ -154,6 +154,62 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 40),
+              // ============================================================
+              // TODO: HAPUS BAGIAN INI SAAT DEPLOY KE PRODUCTION
+              // Fitur "Masuk Tanpa Login" hanya untuk testing frontend
+              // tanpa backend. Hapus dari baris ini sampai komentar 
+              // "AKHIR BAGIAN DEMO" di bawah.
+              // ============================================================
+              // Divider
+              Row(
+                children: [
+                  Expanded(child: Divider(color: Colors.grey.shade300)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 15),
+                    child: Text(
+                      'atau',
+                      style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+                    ),
+                  ),
+                  Expanded(child: Divider(color: Colors.grey.shade300)),
+                ],
+              ),
+              const SizedBox(height: 20),
+              // Tombol Mode Offline
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    // Simpan token dummy supaya LoginCheck di checkout lolos
+                    await AuthService.saveToken('offline-demo-token');
+                    if (!mounted) return;
+                    navigatorKey.currentState?.pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (context) => const BottomNavBar()),
+                      (route) => false,
+                    );
+                  },
+                  icon: const Icon(Icons.wifi_off, color: kprimaryColor),
+                  label: const Text(
+                    'Masuk Tanpa Login (Demo)',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: kprimaryColor,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: kprimaryColor, width: 2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                ),
+              ),
+              // ============================================================
+              // AKHIR BAGIAN DEMO — Hapus sampai sini saat deploy
+              // ============================================================
             ],
           ),
         ),

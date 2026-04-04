@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shoes_store/constant.dart';
+import 'package:shoes_store/screens/order/orderListScreen.dart';
 
 class Profile extends StatelessWidget {
   const Profile({super.key});
@@ -14,6 +16,11 @@ class Profile extends StatelessWidget {
             fit: BoxFit.cover,
             height: size.height,
             width: size.width,
+            errorBuilder: (context, error, stackTrace) => Container(
+              height: size.height,
+              width: size.width,
+              color: kcontentColor,
+            ),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 50), 
@@ -25,7 +32,6 @@ class Profile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: Container(
-
                   width: double.infinity, 
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 15),
                   child: Column(
@@ -87,7 +93,7 @@ class Profile extends StatelessWidget {
                             ),
                             const SizedBox(height: 15),
                             const Text(
-                              "mqwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww",
+                              "Toko sepatu terlengkap dan terpercaya",
                               style: TextStyle(fontSize: 16),
                             ),
                           ],
@@ -106,6 +112,42 @@ class Profile extends StatelessWidget {
                           ],
                         ),
                       ),
+                      const Divider(color: Colors.black12),
+                      const SizedBox(height: 10),
+                      // Tombol Pesanan Saya
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 15),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const OrderListScreen(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.receipt_long, color: Colors.white, size: 20),
+                            label: const Text(
+                              "Pesanan Saya",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: kprimaryColor,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
                     ],
                   ),
                 ),
@@ -116,6 +158,7 @@ class Profile extends StatelessWidget {
       ),
     );
   }
+  
   Widget _buildButton(String label, Color bgColor, Color textColor) {
     return Container(
       decoration: BoxDecoration(
@@ -134,6 +177,7 @@ class Profile extends StatelessWidget {
       ),
     );
   }
+  
   SizedBox friendAndMore(title, number) {
     return SizedBox(
       width: 110,

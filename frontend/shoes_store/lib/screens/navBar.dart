@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:shoes_store/constant.dart';
 import 'package:shoes_store/screens/auth/login_screen.dart';
 import 'package:shoes_store/screens/cart/cartScreen.dart';
 import 'package:shoes_store/screens/favorite/favorite.dart';
 import 'package:shoes_store/screens/home/homeScreen.dart';
 import 'package:shoes_store/screens/profile/profile.dart';
+import 'package:shoes_store/screens/order/orderListScreen.dart';
 import '../services/auth_service.dart';
 import 'chatbot/chatBotScreen.dart';
 
@@ -17,25 +19,43 @@ class BottomNavBar extends StatefulWidget {
 class _BottomNavBarState extends State<BottomNavBar> {
   int currentIndex = 0;
   
-  // ABSOLUTELY NO EXTERNAL WIDGETS HERE
   final List<Widget> screens = [
-  const HomeScreen(),
-  const Favorite(),
-  const ChatbotScreen(),
-  const CartScreen(),
-  const Profile(),
-];
-
+    const HomeScreen(),
+    const Favorite(),
+    const ChatbotScreen(),
+    const CartScreen(),
+    const Profile(),
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Shoes Store - Debug Mode"),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: const Text(
+          "Shoes Store",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+            fontSize: 22,
+          ),
+        ),
         actions: [
+          // Pesanan Saya
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const OrderListScreen()),
+              );
+            },
+            icon: const Icon(Icons.receipt_long_outlined, color: Colors.black),
+            tooltip: 'Pesanan Saya',
+          ),
+          // Logout
           IconButton(
             onPressed: () async {
-              // Clear token for logout
               await AuthService.clearToken();
               
               if (mounted) {
@@ -45,7 +65,8 @@ class _BottomNavBarState extends State<BottomNavBar> {
                 );
               }
             },
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout, color: Colors.black),
+            tooltip: 'Logout',
           ),
         ],
       ),
@@ -54,6 +75,8 @@ class _BottomNavBarState extends State<BottomNavBar> {
         currentIndex: currentIndex,
         onTap: (value) => setState(() => currentIndex = value),
         type: BottomNavigationBarType.fixed,
+        selectedItemColor: kprimaryColor,
+        unselectedItemColor: Colors.grey,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
           BottomNavigationBarItem(icon: Icon(Icons.favorite), label: "Favorite"),

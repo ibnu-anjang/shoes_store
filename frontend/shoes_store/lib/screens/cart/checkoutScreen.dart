@@ -1,0 +1,454 @@
+import 'package:flutter/material.dart';
+import 'package:shoes_store/models/cartItem.dart';
+import 'package:shoes_store/models/orderModel.dart';
+import 'package:shoes_store/provider/cartProvider.dart';
+import 'package:shoes_store/provider/orderProvider.dart';
+import 'package:shoes_store/constant.dart';
+import 'package:shoes_store/screens/navBar.dart';
+import 'package:shoes_store/screens/order/orderListScreen.dart';
+import 'package:shoes_store/services/auth_service.dart';
+import 'package:shoes_store/screens/auth/login_screen.dart';
+
+class CheckoutScreen extends StatefulWidget {
+  final List<CartItem> items;
+  final bool isBuyNow;
+
+  const CheckoutScreen({
+    super.key,
+    required this.items,
+    this.isBuyNow = false,
+  });
+
+  @override
+  State<CheckoutScreen> createState() => _CheckoutScreenState();
+}
+
+class _CheckoutScreenState extends State<CheckoutScreen> {
+  final TextEditingController _alamatController = TextEditingController();
+  final TextEditingController _waController = TextEditingController();
+  String _selectedMethod = 'Bank Transfer';
+
+  final List<Map<String, dynamic>> _methods = [
+    {
+      'id': 'Bank Transfer',
+      'title': 'Transfer Bank (Manual)',
+      'icon': Icons.account_balance_outlined,
+      'description': 'Transfer ke Rekening Resmi PT Shoes Store'
+    },
+    {
+      'id': 'QRIS',
+      'title': 'QRIS / E-Wallet',
+      'icon': Icons.qr_code_scanner_outlined,
+      'description': 'Bayar instan pakai Gopay, OVO, Dana'
+    },
+    {
+      'id': 'COD',
+      'title': 'COD (Bayar di Tempat)',
+      'icon': Icons.handshake_outlined,
+      'description': 'Bayar saat kurir mengantar barang'
+    },
+  ];
+
+  double get _subtotal {
+    double total = 0;
+    for (var item in widget.items) {
+      total += item.totalPrice;
+    }
+    return total;
+  }
+
+  double get _total => _subtotal + CartProvider.flatOngkir;
+
+  Future<void> _handleCheckout() async {
+    if (_alamatController.text.isEmpty || _waController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mohon isi alamat dan nomor WhatsApp!'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    // Check Auth
+    final token = await AuthService.getToken();
+    if (token == null || token.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Silakan login terlebih dahulu!"), backgroundColor: Colors.red),
+      );
+      Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
+      return;
+    }
+
+    final cartProvider = CartProvider.of(context, listen: false);
+    final orderProvider = OrderProvider.of(context, listen: false);
+
+    // 1. Add Order
+    orderProvider.addOrder(
+      items: widget.items,
+      subtotal: _subtotal,
+      ongkir: CartProvider.flatOngkir,
+      total: _total,
+      alamat: _alamatController.text,
+      nomorWA: _waController.text,
+      paymentMethod: _selectedMethod,
+      status: OrderStatus.menungguVerifikasi,
+    );
+
+    // 2. Cleanup Cart if not buy now (remove selected items)
+    if (!widget.isBuyNow) {
+      cartProvider.removeSelected();
+    }
+
+    // 3. Show Success & Navigate
+    if (!mounted) return;
+    _showSuccessDialog();
+  }
+
+  void _showSuccessDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle, color: Colors.green, size: 80),
+            const SizedBox(height: 20),
+            const Text(
+              'Pesanan Berhasil Dibuat! 🚀',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              _selectedMethod == 'COD' 
+                ? 'Silakan siapkan uang tunai saat kurir datang.'
+                : 'Mohon selesaikan pembayaran agar pesanan segera diproses.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 30),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (context) => const BottomNavBar()),
+                    (route) => false,
+                  );
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const OrderListScreen()),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kprimaryColor,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+                child: const Text('Lihat Pesanan Saya', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: kcontentColor,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('Checkout', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        centerTitle: true,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // STEP 1: ALAMAT
+            _buildSectionTitle("Informasi Pengiriman"),
+            const SizedBox(height: 15),
+            _buildAddressInputs(),
+
+            const SizedBox(height: 25),
+            
+            // STEP 2: PESANAN
+            _buildSectionTitle("Ringkasan Pesanan"),
+            const SizedBox(height: 15),
+            _buildOrderItems(),
+
+            const SizedBox(height: 25),
+
+            // STEP 3: METODE PEMBAYARAN
+            _buildSectionTitle("Metode Pembayaran"),
+            const SizedBox(height: 15),
+            ..._methods.map((m) => _buildPaymentMethod(m)),
+
+            // DETAIL PEMBAYARAN (Baru ditambahkan)
+            if (_selectedMethod != 'COD') ...[
+              const SizedBox(height: 15),
+              _buildMethodDetails(),
+            ],
+
+            const SizedBox(height: 25),
+
+            // STEP 4: RINGKASAN HARGA
+            _buildSectionTitle("Ringkasan Pembayaran"),
+            const SizedBox(height: 15),
+            _buildPriceSummary(),
+
+            const SizedBox(height: 40),
+            
+            // TOMBOL BUAT PESANAN
+            ElevatedButton(
+              onPressed: _handleCheckout,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kprimaryColor,
+                minimumSize: const Size(double.infinity, 60),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Buat Pesanan',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+            const SizedBox(height: 50),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+    );
+  }
+
+  Widget _buildAddressInputs() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        children: [
+          TextField(
+            controller: _waController,
+            keyboardType: TextInputType.phone,
+            decoration: InputDecoration(
+              labelText: "Nomor WhatsApp",
+              hintText: "Contoh: 0812345678",
+              prefixIcon: const Icon(Icons.phone, color: kprimaryColor),
+              filled: true,
+              fillColor: kcontentColor,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+            ),
+          ),
+          const SizedBox(height: 15),
+          TextField(
+            controller: _alamatController,
+            maxLines: 2,
+            decoration: InputDecoration(
+              labelText: "Alamat Lengkap",
+              hintText: "Contoh: Jl. Merdeka No. 123, Jakarta",
+              prefixIcon: const Icon(Icons.location_on, color: kprimaryColor),
+              filled: true,
+              fillColor: kcontentColor,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrderItems() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: widget.items.length,
+        separatorBuilder: (ctx, idx) => const Divider(height: 1),
+        itemBuilder: (ctx, idx) {
+          final item = widget.items[idx];
+          return ListTile(
+            contentPadding: const EdgeInsets.all(12),
+            leading: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.asset(item.product.image, width: 60, height: 60, fit: BoxFit.cover),
+            ),
+            title: Text(item.product.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            subtitle: Text("${item.selectedSize} | x${item.quantity}", style: const TextStyle(fontSize: 12)),
+            trailing: Text("\$${item.totalPrice.toStringAsFixed(1)}", style: const TextStyle(fontWeight: FontWeight.bold, color: kprimaryColor)),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPaymentMethod(Map<String, dynamic> method) {
+    bool isSelected = _selectedMethod == method['id'];
+    return GestureDetector(
+      onTap: () => setState(() => _selectedMethod = method['id']),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isSelected ? kprimaryColor : Colors.transparent, width: 2),
+        ),
+        child: Row(
+          children: [
+            Icon(method['icon'], color: isSelected ? kprimaryColor : Colors.grey),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(method['title'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  Text(method['description'], style: TextStyle(color: Colors.grey.shade500, fontSize: 11)),
+                ],
+              ),
+            ),
+            if (isSelected) const Icon(Icons.check_circle, color: kprimaryColor),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMethodDetails() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: _selectedMethod == 'Bank Transfer' 
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Detail Rekening PT', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+              const SizedBox(height: 15),
+              _detailRow('Bank', 'BCA (Modern Shoes Store)'),
+              _detailRow('No. Rekening', '7712 8890 1234'),
+              _detailRow('Nama Penerima', 'PT Shoes Store Modern'),
+              const SizedBox(height: 10),
+              const Text('*Mohon simpan bukti transfer Anda', style: TextStyle(fontSize: 11, color: Colors.red, fontStyle: FontStyle.italic)),
+            ],
+          )
+        : Column(
+            children: [
+              const Text('Scan QRIS Disini', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+              const SizedBox(height: 15),
+              Container(
+                width: 220,
+                height: 220,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: Colors.grey.shade300),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(15),
+                  child: Image.asset(
+                    'assets/images/qris_payment.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.qr_code_2, size: 80, color: Colors.grey),
+                        const SizedBox(height: 10),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          child: Text(
+                            'Ganti file di:\nassets/images/qris_payment.png',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 10, color: Colors.grey.shade400),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text('Sistem akan memverifikasi otomatis setelah Anda klik "Buat Pesanan".', 
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontStyle: FontStyle.italic)),
+            ],
+          ),
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPriceSummary() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        children: [
+          _summaryRow("Subtotal", "\$${_subtotal.toStringAsFixed(1)}"),
+          const SizedBox(height: 10),
+          _summaryRow("Biaya Pengiriman", "\$${CartProvider.flatOngkir.toStringAsFixed(1)}"),
+          const Divider(height: 30),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("Total Tagihan", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              Text("\$${_total.toStringAsFixed(1)}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: kprimaryColor)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.grey)),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
+}
