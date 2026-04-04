@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'provider/cartProvider.dart';
 import 'provider/favoriteProvider.dart';
+import 'provider/addressProvider.dart';
+import 'provider/userProvider.dart';
 import 'provider/orderProvider.dart';
 import 'provider/reviewProvider.dart';
 import 'screens/navBar.dart';
-import 'screens/auth/login_screen.dart';
+import 'screens/auth/loginScreen.dart';
 import 'package:provider/provider.dart';
 
 import 'services/auth_service.dart';
@@ -13,7 +15,7 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Check for existing token (graceful — tidak crash kalau backend mati)
   Widget initialHome;
   try {
@@ -38,26 +40,20 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MultiProvider(
     providers: [
-      ChangeNotifierProvider(
-        create: (_) => CartProvider(),
-      ),
-      ChangeNotifierProvider(
-        create: (_) => FavoriteProvider(),
-      ),
-      ChangeNotifierProvider(
-        create: (_) => OrderProvider(),
-      ),
-      ChangeNotifierProvider(
-        create: (_) => ReviewProvider(),
-      ),
+      ChangeNotifierProvider(create: (_) => CartProvider()),
+      ChangeNotifierProvider(create: (_) => FavoriteProvider()),
+      ChangeNotifierProvider(create: (_) => OrderProvider()),
+      ChangeNotifierProvider(create: (_) => ReviewProvider()),
+      ChangeNotifierProvider(create: (_) => AddressProvider()),
+      ChangeNotifierProvider(create: (_) => UserProvider()),
     ],
-  child: MaterialApp(
-    navigatorKey: navigatorKey,
-    debugShowCheckedModeBanner: false,
-    theme: ThemeData(
-      // textTheme: GoogleFonts.mulishTextTheme(),
+    child: MaterialApp(
+      navigatorKey: navigatorKey,
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        // textTheme: GoogleFonts.mulishTextTheme(),
+      ),
+      home: initialHome,
     ),
-    home: initialHome,
-  ),
   );
-} 
+}

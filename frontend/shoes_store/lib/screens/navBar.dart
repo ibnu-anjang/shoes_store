@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:shoes_store/constant.dart';
-import 'package:shoes_store/screens/auth/login_screen.dart';
 import 'package:shoes_store/screens/cart/cartScreen.dart';
-import 'package:shoes_store/screens/favorite/favorite.dart';
 import 'package:shoes_store/screens/home/homeScreen.dart';
 import 'package:shoes_store/screens/profile/profile.dart';
 import 'package:shoes_store/screens/order/orderListScreen.dart';
-import '../services/auth_service.dart';
-import 'chatbot/chatBotScreen.dart';
+import 'package:shoes_store/screens/favorite/favorite.dart';
+import 'package:shoes_store/screens/chatbot/chatBotScreen.dart';
 
 class BottomNavBar extends StatefulWidget {
   const BottomNavBar({super.key});
@@ -21,8 +19,8 @@ class _BottomNavBarState extends State<BottomNavBar> {
   
   final List<Widget> screens = [
     const HomeScreen(),
-    const Favorite(),
-    const ChatbotScreen(),
+    const OrderListScreen(),
+    const AssistantChatScreen(),
     const CartScreen(),
     const Profile(),
   ];
@@ -42,32 +40,16 @@ class _BottomNavBarState extends State<BottomNavBar> {
           ),
         ),
         actions: [
-          // Pesanan Saya
           IconButton(
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const OrderListScreen()),
+                MaterialPageRoute(builder: (context) => const Favorite()),
               );
             },
-            icon: const Icon(Icons.receipt_long_outlined, color: Colors.black),
-            tooltip: 'Pesanan Saya',
+            icon: const Icon(Icons.favorite_border, color: Colors.black),
           ),
-          // Logout
-          IconButton(
-            onPressed: () async {
-              await AuthService.clearToken();
-              
-              if (mounted) {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (route) => false,
-                );
-              }
-            },
-            icon: const Icon(Icons.logout, color: Colors.black),
-            tooltip: 'Logout',
-          ),
+          const SizedBox(width: 8),
         ],
       ),
       body: screens[currentIndex],
@@ -78,11 +60,11 @@ class _BottomNavBarState extends State<BottomNavBar> {
         selectedItemColor: kprimaryColor,
         unselectedItemColor: Colors.grey,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: "Favorite"),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Beranda"),
+          BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: "Pesanan"),
           BottomNavigationBarItem(icon: Icon(Icons.smart_toy), label: "ChatBot"),
-          BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: "Cart"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+          BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: "Keranjang"),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profil"),
         ],
       ),
     );

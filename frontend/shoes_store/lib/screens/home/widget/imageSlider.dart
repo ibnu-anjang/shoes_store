@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shoes_store/widgets/full_screen_viewer.dart';
 
 class ImageSlider extends StatelessWidget {
   final Function(int) onChange;
@@ -31,9 +32,12 @@ class ImageSlider extends StatelessWidget {
               onPageChanged: onChange,
               physics: const ClampingScrollPhysics(),
               children: sliderImages.map((imagePath) {
-                return Image.asset(
-                  imagePath,
-                  fit: BoxFit.cover, 
+                return GestureDetector(
+                  onTap: () => FullScreenViewer.show(context, AssetImage(imagePath)),
+                  child: Image.asset(
+                    imagePath,
+                    fit: BoxFit.cover,
+                  ),
                 );
               }).toList(),
             ),

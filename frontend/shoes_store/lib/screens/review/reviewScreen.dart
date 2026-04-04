@@ -1,12 +1,23 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:shoes_store/constant.dart';
 import 'package:shoes_store/models/orderModel.dart';
+import 'package:shoes_store/provider/orderProvider.dart';
 import 'package:shoes_store/provider/reviewProvider.dart';
+import 'package:shoes_store/provider/userProvider.dart';
 import 'package:shoes_store/screens/navBar.dart';
 
 class ReviewScreen extends StatefulWidget {
   final Order order;
-  const ReviewScreen({super.key, required this.order});
+  final ReviewItem? existingReview;
+
+  const ReviewScreen({
+    super.key,
+    required this.order,
+    this.existingReview,
+  });
 
   @override
   State<ReviewScreen> createState() => _ReviewScreenState();
@@ -16,6 +27,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
   int _selectedRating = 0;
   final TextEditingController _reviewController = TextEditingController();
   bool _isSubmitted = false;
+  String? _tempImagePath;
 
   @override
   void dispose() {
@@ -23,19 +35,80 @@ class _ReviewScreenState extends State<ReviewScreen> {
     super.dispose();
   }
 
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      if (Platform.isAndroid || Platform.isIOS) {
+        _cropImage(pickedFile.path);
+      } else {
+        setState(() {
+          _tempImagePath = pickedFile.path;
+        });
+      }
+    }
+  }
+
+  Future<void> _cropImage(String filePath) async {
+    final croppedFile = await ImageCropper().cropImage(
+      sourcePath: filePath,
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Atur Foto Ulasan',
+          toolbarColor: kprimaryColor,
+          toolbarWidgetColor: Colors.white,
+          initAspectRatio: CropAspectRatioPreset.original,
+          lockAspectRatio: false,
+          activeControlsWidgetColor: kprimaryColor,
+          aspectRatioPresets: [
+            CropAspectRatioPreset.square,
+            CropAspectRatioPreset.original,
+            CropAspectRatioPreset.ratio4x3,
+          ],
+        ),
+        IOSUiSettings(
+          title: 'Atur Foto Ulasan',
+          aspectRatioPresets: [
+            CropAspectRatioPreset.square,
+            CropAspectRatioPreset.original,
+          ],
+        ),
+      ],
+    );
+
+    if (croppedFile != null) {
+      setState(() {
+        _tempImagePath = croppedFile.path;
+      });
+    }
+  }
+
   void _submitReview() {
     if (_selectedRating == 0) return;
 
     final reviewProvider = ReviewProvider.of(context, listen: false);
+    final orderProvider = OrderProvider.of(context, listen: false);
+    final userProvider = UserProvider.of(context, listen: false);
     
-    reviewProvider.addReview(ReviewItem(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      productId: widget.order.items.first.product.title, 
-      userName: "User Demo", 
+    final review = ReviewItem(
+      id: widget.existingReview?.id ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
+      productId: widget.order.items.first.product.title,
+      userId: userProvider.userId, // Use stable ID
+      userName: userProvider.userName, 
       rating: _selectedRating.toDouble(),
       comment: _reviewController.text,
       date: DateTime.now(),
-    ));
+      imagePath: _tempImagePath,
+    );
+
+    if (widget.existingReview != null) {
+      reviewProvider.updateReview(review);
+    } else {
+      reviewProvider.addReview(review);
+      orderProvider.markAsReviewed(widget.order.id);
+    }
 
     setState(() {
       _isSubmitted = true;
@@ -253,6 +326,138 @@ class _ReviewScreenState extends State<ReviewScreen> {
           ),
 
           const SizedBox(height: 20),
+
+          // Upload Photo (Optional)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Text(
+                      'Tambahkan Foto',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    SizedBox(width: 5),
+                    Text(
+                      '(Opsional)',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 15),
+                if (_tempImagePath == null)
+                  GestureDetector(
+                    onTap: _pickImage,
+                    child: Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        color: kcontentColor,
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(
+                          color: Colors.grey.shade300,
+                          style: BorderStyle.solid,
+                        ),
+                      ),
+                      child: const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_a_photo_outlined, color: Colors.grey),
+                          SizedBox(height: 5),
+                          Text(
+                            'Pilih Foto',
+                            style: TextStyle(color: Colors.grey, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  Stack(
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => Dialog.fullscreen(
+                              backgroundColor: Colors.black,
+                              child: Stack(
+                                children: [
+                                  Center(
+                                    child: InteractiveViewer(
+                                      child: Image.file(
+                                        File(_tempImagePath!),
+                                        fit: BoxFit.contain,
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    top: 40,
+                                    right: 20,
+                                    child: IconButton(
+                                      icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                                      onPressed: () => Navigator.pop(context),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(15),
+                            image: DecorationImage(
+                              image: FileImage(File(_tempImagePath!)),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: -5,
+                        right: -5,
+                        child: GestureDetector(
+                          onTap: () => setState(() => _tempImagePath = null),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close,
+                                color: Colors.white, size: 16),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
 
           const SizedBox(height: 30),
 

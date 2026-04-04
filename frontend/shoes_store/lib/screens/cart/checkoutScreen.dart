@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:shoes_store/models/cartItem.dart';
 import 'package:shoes_store/models/orderModel.dart';
+import 'package:shoes_store/provider/addressProvider.dart';
 import 'package:shoes_store/provider/cartProvider.dart';
 import 'package:shoes_store/provider/orderProvider.dart';
 import 'package:shoes_store/constant.dart';
 import 'package:shoes_store/screens/navBar.dart';
 import 'package:shoes_store/screens/order/orderListScreen.dart';
 import 'package:shoes_store/services/auth_service.dart';
-import 'package:shoes_store/screens/auth/login_screen.dart';
+import 'package:shoes_store/screens/auth/loginScreen.dart';
+import 'package:shoes_store/screens/profile/address/addressListScreen.dart';
+import 'package:shoes_store/screens/profile/address/addAddressScreen.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final List<CartItem> items;
@@ -62,26 +65,78 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _handleCheckout() async {
     if (_alamatController.text.isEmpty || _waController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mohon isi alamat dan nomor WhatsApp!'), backgroundColor: Colors.red),
+        const SnackBar(
+            content: Text('Mohon isi alamat dan nomor WhatsApp!'),
+            backgroundColor: Colors.red),
       );
       return;
     }
+
+    // Confirmation Dialog before placing order
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Konfirmasi Pesanan",
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("Apakah Anda yakin ingin membuat pesanan ini?"),
+            const SizedBox(height: 15),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Total Tagihan:", style: TextStyle(color: Colors.grey)),
+                Text("\$${_total.toStringAsFixed(1)}",
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, color: kprimaryColor)),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("Batal", style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kprimaryColor,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text("Ya, Pesan Sekarang",
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
 
     // Check Auth
     final token = await AuthService.getToken();
     if (token == null || token.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Silakan login terlebih dahulu!"), backgroundColor: Colors.red),
+        const SnackBar(
+            content: Text("Silakan login terlebih dahulu!"),
+            backgroundColor: Colors.red),
       );
-      Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
+      Navigator.push(
+          context, MaterialPageRoute(builder: (context) => const LoginScreen()));
       return;
     }
 
     final cartProvider = CartProvider.of(context, listen: false);
     final orderProvider = OrderProvider.of(context, listen: false);
+    final addressProvider = AddressProvider.of(context, listen: false);
 
     // 1. Add Order
+    final isCOD = _selectedMethod == 'COD';
     orderProvider.addOrder(
       items: widget.items,
       subtotal: _subtotal,
@@ -90,20 +145,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       alamat: _alamatController.text,
       nomorWA: _waController.text,
       paymentMethod: _selectedMethod,
-      status: OrderStatus.menungguVerifikasi,
+      status: isCOD ? OrderStatus.diproses : OrderStatus.menungguVerifikasi,
     );
 
-    // 2. Cleanup Cart if not buy now (remove selected items)
+    // 2. Cleanup Selected Address for next time
+    addressProvider.clearSelectedAddress();
+
+    // 3. Cleanup Cart if not buy now (remove selected items)
     if (!widget.isBuyNow) {
       cartProvider.removeSelected();
     }
 
-    // 3. Show Success & Navigate
+    // 4. Show Success & Navigate
     if (!mounted) return;
-    _showSuccessDialog();
+    _showSuccessDialog(isCOD);
   }
 
-  void _showSuccessDialog() {
+  void _showSuccessDialog(bool isCOD) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -114,15 +172,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           children: [
             const Icon(Icons.check_circle, color: Colors.green, size: 80),
             const SizedBox(height: 20),
-            const Text(
-              'Pesanan Berhasil Dibuat! 🚀',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+            Text(
+              isCOD ? 'Pesanan Berhasil Dibuat! 📦' : 'Pesanan Berhasil Dibuat! 🚀',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 10),
             Text(
-              _selectedMethod == 'COD' 
-                ? 'Silakan siapkan uang tunai saat kurir datang.'
+              isCOD 
+                ? 'Terima kasih! Pesanan Anda akan segera kami proses dan dikirim.'
                 : 'Mohon selesaikan pembayaran agar pesanan segera diproses.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey.shade600),
@@ -239,6 +297,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildAddressInputs() {
+    final addressProvider = AddressProvider.of(context);
+    final selectedAddress = addressProvider.selectedAddress;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -246,32 +307,73 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextField(
-            controller: _waController,
-            keyboardType: TextInputType.phone,
-            decoration: InputDecoration(
-              labelText: "Nomor WhatsApp",
-              hintText: "Contoh: 0812345678",
-              prefixIcon: const Icon(Icons.phone, color: kprimaryColor),
-              filled: true,
-              fillColor: kcontentColor,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("Alamat Pengiriman", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => selectedAddress != null 
+                        ? const AddressListScreen(isSelectionMode: true) 
+                        : const AddAddressScreen(),
+                    ),
+                  );
+                },
+                child: Text(
+                  selectedAddress != null ? "Ubah" : "Tambah",
+                  style: const TextStyle(color: kprimaryColor, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 15),
-          TextField(
-            controller: _alamatController,
-            maxLines: 2,
-            decoration: InputDecoration(
-              labelText: "Alamat Lengkap",
-              hintText: "Contoh: Jl. Merdeka No. 123, Jakarta",
-              prefixIcon: const Icon(Icons.location_on, color: kprimaryColor),
-              filled: true,
-              fillColor: kcontentColor,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+          const Divider(height: 20),
+          if (selectedAddress != null) ...[
+            Row(
+              children: [
+                const Icon(Icons.location_on, color: kprimaryColor, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "${selectedAddress.receiverName} | ${selectedAddress.phoneNumber}",
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        selectedAddress.fullAddress,
+                        style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ),
+            // Update controllers silently for order creation logic
+            () {
+               _alamatController.text = selectedAddress.fullAddress;
+               _waController.text = selectedAddress.phoneNumber;
+               return const SizedBox.shrink();
+            }(),
+          ] else
+            Center(
+              child: Column(
+                children: [
+                  Icon(Icons.location_off_outlined, color: Colors.grey.shade300, size: 40),
+                  const SizedBox(height: 10),
+                  Text(
+                    "Belum ada alamat pengiriman",
+                    style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );

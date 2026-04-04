@@ -1,12 +1,16 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shoes_store/constant.dart';
 import 'package:shoes_store/provider/reviewProvider.dart';
+import 'package:shoes_store/provider/userProvider.dart';
+import 'package:shoes_store/provider/orderProvider.dart';
+import 'package:shoes_store/screens/review/reviewScreen.dart';
 
 class Description extends StatefulWidget {
-  final String productId; // Ditambahkan untuk filter review
+  final String productId;
   final String description;
   final String specification;
-  final double initialRate; // Untuk perhitungan akumulasi
+  final double initialRate;
 
   const Description({
     super.key,
@@ -26,6 +30,9 @@ class _DescriptionState extends State<Description> {
   @override
   Widget build(BuildContext context) {
     final reviewProvider = ReviewProvider.of(context);
+    final userProvider = UserProvider.of(context);
+    final orderProvider = OrderProvider.of(context);
+
     final localReviews = reviewProvider.getProductReviews(widget.productId);
     final avgRating = reviewProvider.getAverageRating(widget.productId, widget.initialRate);
 
@@ -73,7 +80,10 @@ class _DescriptionState extends State<Description> {
                ),
              )
           else
-            ...localReviews.map((review) => Container(
+            ...localReviews.map((review) {
+              final isOwnReview = review.userId == userProvider.userId;
+              
+              return Container(
                   margin: const EdgeInsets.only(bottom: 15),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -86,10 +96,84 @@ class _DescriptionState extends State<Description> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(review.userName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          Text(
-                            "${review.date.day}/${review.date.month}/${review.date.year}",
-                            style: const TextStyle(color: Colors.grey, fontSize: 11),
+                          Row(
+                            children: [
+                              Text(review.userName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              if (isOwnReview)
+                                Container(
+                                  margin: const EdgeInsets.only(left: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: kprimaryColor.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Text("Anda", style: TextStyle(color: kprimaryColor, fontSize: 10, fontWeight: FontWeight.bold)),
+                                ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              Text(
+                                "${review.date.day}/${review.date.month}/${review.date.year}",
+                                style: const TextStyle(color: Colors.grey, fontSize: 11),
+                              ),
+                              if (isOwnReview) ...[
+                                const SizedBox(width: 12),
+                                // EDIT BUTTON
+                                GestureDetector(
+                                  onTap: () {
+                                    // Cari order yang sesuai produk ini
+                                    try {
+                                      final order = orderProvider.orders.firstWhere(
+                                        (o) => o.items.any((item) => item.product.title == widget.productId)
+                                      );
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ReviewScreen(
+                                            order: order,
+                                            existingReview: review,
+                                          ),
+                                        ),
+                                      );
+                                    } catch (e) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text("Data pesanan tidak ditemukan")),
+                                      );
+                                    }
+                                  },
+                                  child: const Icon(Icons.edit_outlined, size: 18, color: Colors.blue),
+                                ),
+                                const SizedBox(width: 10),
+                                // DELETE BUTTON
+                                GestureDetector(
+                                  onTap: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                        title: const Text("Hapus Ulasan"),
+                                        content: const Text("Apakah Anda yakin ingin menghapus ulasan ini?"),
+                                        actions: [
+                                          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Batal")),
+                                          TextButton(
+                                            onPressed: () {
+                                              reviewProvider.deleteReview(widget.productId, review.id);
+                                              Navigator.pop(ctx);
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(content: Text("Ulasan berhasil dihapus")),
+                                              );
+                                            },
+                                            child: const Text("Hapus", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                  child: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                                ),
+                              ],
+                            ],
                           ),
                         ],
                       ),
@@ -102,9 +186,58 @@ class _DescriptionState extends State<Description> {
                       ),
                       const SizedBox(height: 8),
                       Text(review.comment, style: const TextStyle(fontSize: 13)),
+                      if (review.imagePath != null) ...[
+                        const SizedBox(height: 10),
+                      GestureDetector(
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => Dialog.fullscreen(
+                              backgroundColor: Colors.black,
+                              child: Stack(
+                                children: [
+                                  Center(
+                                    child: InteractiveViewer(
+                                      child: Image.file(
+                                        File(review.imagePath!),
+                                        fit: BoxFit.contain,
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    top: 40,
+                                    right: 20,
+                                    child: IconButton(
+                                      icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                                      onPressed: () => Navigator.pop(context),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.file(
+                            File(review.imagePath!),
+                            width: 100,
+                            height: 100,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              width: 100,
+                              height: 100,
+                              color: Colors.grey.shade300,
+                              child: const Icon(Icons.broken_image, color: Colors.grey),
+                            ),
+                          ),
+                        ),
+                      ),
+                      ],
                     ],
                   ),
-                )),
+                );
+            }).toList(),
         ],
       );
     }
@@ -171,7 +304,7 @@ class _DescriptionState extends State<Description> {
         /// 🔥 CONTENT (ANIMASI)
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
-          child: SizedBox( // Menggunakan SizedBox untuk tinggi yang lebih fleksibel
+          child: SizedBox(
             width: double.infinity,
             key: ValueKey(selectedIndex),
             child: content,

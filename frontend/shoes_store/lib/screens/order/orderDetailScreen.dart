@@ -78,11 +78,40 @@ class OrderDetailScreen extends StatelessWidget {
 
             // Tombol Review (jika status = diterima)
             if (currentOrder.status == OrderStatus.diterima)
-              _buildReviewButton(context, currentOrder),
+              currentOrder.isReviewed 
+                ? _buildReviewedLabel()
+                : _buildReviewButton(context, currentOrder),
 
             const SizedBox(height: 30),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildReviewedLabel() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 15),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.green.shade100),
+      ),
+      child: const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.check_circle, color: Colors.green, size: 20),
+          SizedBox(width: 10),
+          Text(
+            'Pesanan Telah Diulas ✅',
+            style: TextStyle(
+              color: Colors.green,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+        ],
       ),
     );
   }

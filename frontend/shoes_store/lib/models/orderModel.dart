@@ -19,6 +19,7 @@ class Order {
   OrderStatus status;
   String? resi;
   final String? paymentMethod;
+  bool isReviewed;
 
   Order({
     required this.id,
@@ -32,6 +33,7 @@ class Order {
     this.status = OrderStatus.diproses,
     this.resi,
     this.paymentMethod,
+    this.isReviewed = false,
   });
 
   String get statusText {

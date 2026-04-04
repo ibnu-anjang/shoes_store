@@ -151,3 +151,101 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(database.get_d
         print(f"DATABASE ERROR: {e}")
         raise HTTPException(
             status_code=500, detail="Gagal menyimpan ke database. Coba lagi nanti.")
+
+# --- ENDPOINT FAVORITE (WISHLIST) ---
+
+@app.post("/favorites", response_model=schemas.FavoriteResponse)
+def toggle_favorite(fav: schemas.FavoriteCreate, username: str, db: Session = Depends(database.get_db)):
+    # Cari user berdasarkan username (karena token kita sementara pakai username)
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
+    
+    # Cek apakah sudah ada di favorit
+    existing = db.query(models.Favorite).filter(
+        models.Favorite.user_id == user.id,
+        models.Favorite.product_id == fav.product_id
+    ).first()
+    
+    if existing:
+        db.delete(existing)
+        db.commit()
+        return {"id": existing.id, "user_id": user.id, "product_id": fav.product_id}
+    
+    new_fav = models.Favorite(user_id=user.id, product_id=fav.product_id)
+    db.add(new_fav)
+    db.commit()
+    db.refresh(new_fav)
+    return new_fav
+
+@app.get("/favorites", response_model=List[schemas.ProductResponse])
+def get_user_favorites(username: str, db: Session = Depends(database.get_db)):
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
+    
+    # Join favorit dengan produk
+    results = db.query(models.Product).join(
+        models.Favorite, models.Product.id == models.Favorite.product_id
+    ).filter(models.Favorite.user_id == user.id).all()
+    
+    return results
+
+# --- ENDPOINT ORDERS (HISTORY) ---
+
+@app.post("/orders", response_model=schemas.OrderResponse)
+def create_order(order_data: schemas.OrderCreate, username: str, db: Session = Depends(database.get_db)):
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
+    
+    new_order = models.Order(
+        id=order_data.id,
+        user_id=user.id,
+        total=order_data.total,
+        status=order_data.status
+    )
+    db.add(new_order)
+    
+    for item in order_data.items:
+        db_item = models.OrderItem(
+            order_id=order_data.id,
+            product_id=item.product_id,
+            quantity=item.quantity,
+            selected_size=item.selected_size,
+            selected_color=item.selected_color,
+            price=item.price
+        )
+        db.add(db_item)
+    
+    db.commit()
+    db.refresh(new_order)
+    return new_order
+
+@app.get("/orders", response_model=List[schemas.OrderResponse])
+def get_order_history(username: str, db: Session = Depends(database.get_db)):
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
+    
+    return db.query(models.Order).filter(models.Order.user_id == user.id).all()
+
+# --- ENDPOINT CHATBOT (SIMULASI PINTAR) ---
+
+@app.post("/chat", response_model=schemas.ChatResponse)
+def chat_with_bot(request: schemas.ChatRequest):
+    msg = request.message.lower()
+    
+    # Logika Bot Sederhana tapi Terlihat Pintar untuk Presentasi
+    if "promo" in msg or "diskon" in msg:
+        reply = "Tentu! Saat ini ada promo diskon 20% untuk semua koleksi Jordan. Gunakan kode: SHOES20."
+    elif "kirim" in msg or "ongkir" in msg:
+        reply = "Kami mendukung pengiriman ke seluruh Indonesia via JNE dan SiCepat. Gratis ongkir untuk pembelian di atas $200!"
+    elif "stok" in msg or "ready" in msg:
+        reply = "Semua produk yang tampil di aplikasi kami saat ini berstatus Ready Stock, Kak."
+    elif "halo" in msg or "hi" in msg or "p" in msg:
+        reply = "Halo! Saya Sneakerhead Assistant. Ada yang bisa saya bantu seputar produk sepatu kami?"
+    else:
+        reply = "Pertanyaan yang bagus! Untuk info lebih detail, Anda bisa menghubungi tim support kami atau cek deskripsi di tiap produk ya."
+    
+    return {"reply": reply}

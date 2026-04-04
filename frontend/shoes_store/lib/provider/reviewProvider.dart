@@ -6,37 +6,45 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ReviewItem {
   final String id;
   final String productId;
+  final String userId;
   final String userName;
   final double rating;
   final String comment;
   final DateTime date;
+  final String? imagePath;
 
   ReviewItem({
     required this.id,
     required this.productId,
+    required this.userId,
     required this.userName,
     required this.rating,
     required this.comment,
     required this.date,
+    this.imagePath,
   });
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'productId': productId,
+        'userId': userId,
         'userName': userName,
         'rating': rating,
         'comment': comment,
         'date': date.toIso8601String(),
+        'imagePath': imagePath,
       };
 
   factory ReviewItem.fromJson(Map<String, dynamic> json) {
     return ReviewItem(
       id: json['id'],
       productId: json['productId'],
+      userId: json['userId'] ?? json['userName'], // Fallback for old data
       userName: json['userName'],
       rating: (json['rating'] as num).toDouble(),
       comment: json['comment'],
       date: DateTime.parse(json['date']),
+      imagePath: json['imagePath'],
     );
   }
 }
@@ -88,6 +96,25 @@ class ReviewProvider extends ChangeNotifier {
     _reviews[review.productId]!.insert(0, review);
     _saveReviews();
     notifyListeners();
+  }
+
+  void updateReview(ReviewItem review) {
+    if (_reviews.containsKey(review.productId)) {
+      final index = _reviews[review.productId]!.indexWhere((item) => item.id == review.id);
+      if (index != -1) {
+        _reviews[review.productId]![index] = review;
+        _saveReviews();
+        notifyListeners();
+      }
+    }
+  }
+
+  void deleteReview(String productId, String reviewId) {
+    if (_reviews.containsKey(productId)) {
+      _reviews[productId]!.removeWhere((item) => item.id == reviewId);
+      _saveReviews();
+      notifyListeners();
+    }
   }
 
   List<ReviewItem> getProductReviews(String productId) {

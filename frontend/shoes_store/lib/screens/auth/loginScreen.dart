@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shoes_store/constant.dart';
 import 'package:shoes_store/services/auth_service.dart';
 import 'package:shoes_store/screens/navBar.dart';
-import 'package:shoes_store/screens/auth/register_screen.dart';
+import 'package:shoes_store/screens/auth/registerScreen.dart';
 import 'package:shoes_store/main.dart';
 
 class LoginScreen extends StatefulWidget {

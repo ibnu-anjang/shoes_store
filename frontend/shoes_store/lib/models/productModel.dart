@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 class Product {
+  final int id;
   final String title;
   final String description;
   final String specification;
@@ -15,6 +16,7 @@ class Product {
   int quantity;
 
   Product({
+    required this.id,
     required this.title,
     required this.review,
     required this.description,
@@ -32,6 +34,7 @@ class Product {
 
   factory Product.fromJson(Map<String, dynamic> json) {
     return Product(
+      id: json['id'] ?? 0,
       title: json['name'] ?? '',
       description: json['description'] ?? '',
       specification: json['specification'] ?? "No specification",
@@ -48,6 +51,7 @@ class Product {
   }
 
   Map<String, dynamic> toJson() => {
+        'id': id,
         'name': title,
         'description': description,
         'price': price,
@@ -56,6 +60,7 @@ class Product {
 
 final List<Product> products = [
   Product(
+    id: 1,
     title: "Adidas Duramo",
     description: "The Adidas Duramo is a stylish and comfortable running designed for everyday wear. It features a large Air unit in the heel for cushioning and a sleek, modern design.",
     specification: "Material: Knit upper\nCushioning: Air\nOutsole: Rubber\nWeight: 350g\nDrop: 12mm",
@@ -70,6 +75,7 @@ final List<Product> products = [
     quantity: 1,
   ),
   Product(
+    id: 2,
     title: "Adidas Run Blaze",
     description: "The Adidas Run Blaze is a high-performance running shoe that combines comfort and style. It features Boost cushioning technology for energy return and a Primeknit upper for a snug fit.",
     specification: "Material: Knit upper\nCushioning: Boost\nOutsole: Continental Rubber\nWeight: 310g\nDrop: 10mm",
@@ -84,6 +90,7 @@ final List<Product> products = [
     quantity: 1,
   ),
   Product(
+    id: 3,
     title: "Arka Khaki",
     description: "The Arka Khaki is a stylish and comfortable sneaker designed for everyday wear. It features a large Air unit in the heel for cushioning and a sleek, modern design.",
     specification: "Material: Knit upper\nCushioning: Air\nOutsole: Rubber\nWeight: 350g\nDrop: 12mm",
@@ -98,6 +105,7 @@ final List<Product> products = [
     quantity: 1,
   ),
   Product(
+    id: 4,
     title: "Gino Mariani Ederly",
     description: "The Gino Mariani Ederly is a stylish and comfortable flat shoe designed for everyday wear. It features a large Air unit in the heel for cushioning and a sleek, modern design.",
     specification: "Material: Knit upper\nCushioning: Air\nOutsole: Rubber\nWeight: 350g\nDrop: 12mm",
@@ -112,6 +120,7 @@ final List<Product> products = [
     quantity: 1,
   ),
   Product(
+    id: 5,
     title: "Gino Mariani Holland",
     description: "The Gino Mariani Holland is a stylish and comfortable formal shoe designed for everyday wear. It features a large Air unit in the heel for cushioning and a sleek, modern design.",
     specification: "Material: Knit upper\nCushioning: Air\nOutsole: Rubber\nWeight: 350g\nDrop: 12mm",
@@ -126,6 +135,7 @@ final List<Product> products = [
     quantity: 1,
   ),
   Product(
+    id: 6,
     title: "Hailey",
     description: "The Hailey is a stylish and comfortable sneaker designed for everyday wear. It features a large Air unit in the heel for cushioning and a sleek, modern design.",
     specification: "Material: Knit upper\nCushioning: Air\nOutsole: Rubber\nWeight: 350g\nDrop: 12mm",
@@ -140,6 +150,7 @@ final List<Product> products = [
     quantity: 1,
   ),
   Product(
+    id: 7,
     title: "Heaves",
     description: "The Heaves is a stylish and comfortable flat shoe designed for everyday wear. It features a large Air unit in the heel for cushioning and a sleek, modern design.",
     specification: "Material: Knit upper\nCushioning: Air\nOutsole: Rubber\nWeight: 350g\nDrop: 12mm",
@@ -154,6 +165,7 @@ final List<Product> products = [
     quantity: 1,
   ),
   Product(
+    id: 8,
     title: "Marelli",
     description: "The Marelli is a stylish and comfortable formal shoe designed for everyday wear. It features a large Air unit in the heel for cushioning and a sleek, modern design.",
     specification: "Material: Knit upper\nCushioning: Air\nOutsole: Rubber\nWeight: 350g\nDrop: 12mm",
@@ -168,6 +180,7 @@ final List<Product> products = [
     quantity: 1,
   ),
   Product(
+    id: 9,
     title: "PM 172 Pedro",
     description: "The PM 172 Pedro is a stylish and comfortable loafers shoe designed for everyday wear. It features a large Air unit in the heel for cushioning and a sleek, modern design.",
     specification: "Material: Knit upper\nCushioning: Air\nOutsole: Rubber\nWeight: 350g\nDrop: 12mm",
@@ -182,6 +195,7 @@ final List<Product> products = [
     quantity: 1,
   ),
   Product(
+    id: 10,
     title: "Skechers",
     description: "The Skechers is a stylish and comfortable slip-on shoe designed for everyday wear. It features a large Air unit in the heel for cushioning and a sleek, modern design.",
     specification: "Material: Knit upper\nCushioning: Air\nOutsole: Rubber\nWeight: 350g\nDrop: 12mm",
@@ -196,6 +210,7 @@ final List<Product> products = [
     quantity: 1,
   ),
   Product(
+    id: 11,
     title: "Vans Classic",
     description: "The Vans Classic is a timeless and versatile slip-on that combines durability and style. It features a canvas upper and a durable rubber sole for all-day wear.",
     specification: "Material: Canvas\nCushioning: Standard\nOutsole: Rubber\nWeight: 300g\nDrop: 8mm",
@@ -210,6 +225,7 @@ final List<Product> products = [
     quantity: 1,
   ),
   Product(
+    id: 12,
     title: "Wirken",
     description: "The Wirken is a stylish and comfortable loafer shoe designed for everyday wear. It features a durable upper and a cushioned sole for all-day comfort.",
     specification: "Material: Synthetic\nCushioning: Standard\nOutsole: Rubber\nWeight: 320g\nDrop: 9mm",
