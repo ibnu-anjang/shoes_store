@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:shoes_store/models/productModel.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shoes_store/constant.dart';
 
 class FavoriteProvider extends ChangeNotifier {
   final List<Product> _favorites = [];
@@ -13,7 +14,7 @@ class FavoriteProvider extends ChangeNotifier {
   Future<void> fetchFavorites(String username) async {
     _currentUsername = username;
     try {
-      final response = await http.get(Uri.parse("http://10.0.2.2:8000/favorites?username=$username"));
+      final response = await http.get(Uri.parse("$kBaseUrl/favorites?username=$username"));
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         _favorites.clear();
@@ -29,7 +30,7 @@ class FavoriteProvider extends ChangeNotifier {
     // Alur Skakmat: Langsung tembak API Backend menggunakan ID yang baru kita buat
     try {
       final response = await http.post(
-        Uri.parse("http://10.0.2.2:8000/favorites?username=$_currentUsername"),
+        Uri.parse("$kBaseUrl/favorites?username=$_currentUsername"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"product_id": product.id}),
       );

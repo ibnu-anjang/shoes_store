@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shoes_store/constant.dart';
 
 class AssistantChatScreen extends StatefulWidget {
   const AssistantChatScreen({super.key});
@@ -30,7 +31,7 @@ class _AssistantChatScreenState extends State<AssistantChatScreen> {
     try {
       // Alur Operasi Bungkam: Panggil backend simulasi cerdas
       final response = await http.post(
-        Uri.parse("http://10.0.2.2:8000/chat"), // URL default emulator
+        Uri.parse("$kBaseUrl/chat"), // Menggunakan Saklar Global
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"message": userMessage}),
       );

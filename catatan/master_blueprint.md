@@ -10,7 +10,9 @@ Struktur teknologi yang digunakan untuk menjamin kestabilan dan skalabilitas apl
 -   **Frontend**: Flutter Framework dengan arsitektur **Provider Pattern** (State Management).
 -   **Backend**: FastAPI (Python) dengan **Asynchronous Uvicorn Server**.
 -   **Database**: SQLAlchemy ORM (Object Relational Mapper) dengan **SQLite/MySQL** engine.
--   **Infrastruktur**: **Dockerized Environment** (Backend/Dockerfile) siap deploy via **Cloudflare Tunnel**.
+-   **Infrastruktur**: **Dockerized Environment** (Backend/Dockerfile & docker-compose.yml).
+-   **Public Access**: **Cloudflare Tunnel (cloudflared)** terintegrasi dengan **Domain Pribadi User**.
+-   **Environment**: Seluruh proses pengembangan dilakukan di laptop ini agar User hanya perlu melakukan *setting & run*.
 
 ---
 
@@ -71,12 +73,39 @@ Sesuai sketsa pengerjaan Admin via Web:
 
 ---
 
-## 🏁 6. TUESDAY ZERO-BUG ROADMAP (URGENT)
+## 🏗️ 6. DEPLOYMENT & INFRASTRUCTURE (MANDATORY)
+Developer **DILARANG** memberikan alasan terkait server. Seluruh sistem harus siap lari dengan spesifikasi:
+-   **Docker Ready**: Seluruh backend harus bisa dijalankan hanya dengan perintah `docker-compose up --build`. Pastikan semua `environment variables` terkonfigurasi dengan benar.
+-   **Cloudflare Tunnel**: Backend harus bisa diakses secara publik melalui **Cloudflare Tunnel** menggunakan **Domain Pribadi** yang sudah disediakan oleh User. 
+-   **Zero-Config for User**: Tugas Developer adalah memastikan seluruh proses *build* di laptop ini berhasil (100% success rate). User hanya bertugas memasukkan variabel domain dan menjalankan sistem.
+
+---
+
+## 🏁 7. TUESDAY ZERO-BUG ROADMAP (URGENT)
 Prioritas pengerjaan (Urutan tidak boleh dibalik):
 1.  **Refactor Names**: Rapikan seluruh nama file agar laporannya "RAPI" (Sketsa 2).
 2.  **Sync DB**: Pindahkan data Favorite & Order dari memori HP ke Database asli (SQLAlchemy).
 3.  **Activate Chatbot**: Sambungkan UI ke Gemini AI Backend.
 4.  **Admin Docs**: Pastikan endpoint CRUD barang berfungsi 100% di Swagger untuk demo presentasi.
+5.  **Dockerize Everything**: Pastikan sistem siap dijalankan via domain dan docker tanpa error.
+
+---
+
+## 🌐 8. REMOTE ACCESS & ONLINE MODE (CLOUDFLARE BRIDGE)
+Aplikasi **WAJIB** bisa diakses oleh pihak luar (Teman/Dosen) dari lokasi berbeda tanpa hosting berbayar:
+1.  **Technology**: Gunakan **Cloudflare Tunnel** yang sudah ada di `docker-compose.yml`.
+2.  **Frontend Config**: Alamat API di Flutter sudah disentralisasi di `lib/constant.dart`. 
+    -   Untuk Demo Lokal: Gunakan `http://10.0.2.2:8000`.
+    -   Untuk Akses Jarak Jauh: Ganti `kBaseUrl` dengan Domain Cloudflare Anda (Format: `https://api.domainanda.com`).
+3.  **Mandat Khusus**: Developer wajib memastikan saat `kBaseUrl` diganti ke domain publik, seluruh fitur (Chatbot, Order, Favorite) tetap berjalan lancar (100% Connectivity).
+
+---
+
+## 📚 9. HANDOVER & KNOWLEDGE TRANSFER (MANDATORY)
+Developer **WAJIB** memberikan tutorial singkat dan padat kepada User (dalam bahasa non-teknis) mengenai:
+1.  **Cloudflare Setup**: Cara mendapatkan **Tunnel Token** dari Cloudflare Dashboard dan cara memasukkannya ke `docker-compose.yml`.
+2.  **Domain Mapping**: Cara menyambungkan domain pribadi ke tunnel tersebut agar aplikasi bisa diakses online.
+3.  **Run Strategy**: Panduan satu-tombol untuk menjalankan sistem di laptop ini sehingga User bisa mendemokannya kapan saja tanpa bantuan Developer.
 
 ---
 

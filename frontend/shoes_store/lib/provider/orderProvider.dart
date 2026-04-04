@@ -4,6 +4,7 @@ import 'package:shoes_store/models/cartItem.dart';
 import 'package:shoes_store/models/orderModel.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shoes_store/constant.dart';
 
 class OrderProvider extends ChangeNotifier {
   final List<Order> _orders = [];
@@ -56,7 +57,7 @@ class OrderProvider extends ChangeNotifier {
       };
 
       final response = await http.post(
-        Uri.parse("http://10.0.2.2:8000/orders?username=$_currentUsername"),
+        Uri.parse("$kBaseUrl/orders?username=$_currentUsername"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode(orderData),
       );
@@ -77,7 +78,7 @@ class OrderProvider extends ChangeNotifier {
   Future<void> fetchOrders(String username) async {
     _currentUsername = username;
     try {
-      final response = await http.get(Uri.parse("http://10.0.2.2:8000/orders?username=$username"));
+      final response = await http.get(Uri.parse("$kBaseUrl/orders?username=$username"));
       if (response.statusCode == 200) {
         // Logic untuk parse dari backend ke model Order lokal bisa ditambahkan programmer nantinya
         // Tapi setidaknya data sudah bisa ditarik balik kalau Anda butuh demo
