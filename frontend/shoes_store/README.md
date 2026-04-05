@@ -64,24 +64,7 @@ Jika terminal sudah OK tapi di editor (VS Code/Android Studio) masih ada garis m
 
 ---
 
-## 🔗 Langkah 4: Konfigurasi Backend (Link to Database)
-Aplikasi butuh tahu di mana lokasi Backend kamu berada agar data produk tidak kosong.
-
-1.  Buka file: `lib/constant.dart`
-2.  Cari variabel `kBaseUrl` di baris terakhir.
-3.  Sesuaikan isinya:
-    - **Emulator Android**: Tetap gunakan `http://10.0.2.2:8000`
-    - **HP Asli (Real Device)**: Gunakan IP Laptop kamu (cek via `ipconfig` atau `ifconfig`), contoh: `http://192.168.1.10:8000`
-    - **Domain Cloudflare**: Masukkan URL tunnel jika sudah hosting sendiri.
-
-```dart
-// Contoh di lib/constant.dart
-const kBaseUrl = "http://10.0.2.2:8000"; // Ganti ini sesuai lokasi Backend!
-```
-
----
-
-## 🚀 Langkah 5: Running & Debugging
+## 🚀 Langkah 4: Running & Debugging
 Jika semua langkah di atas sudah dilakukan, semua file `lib` harusnya sudah bersih dari garis merah.
 
 ```bash
