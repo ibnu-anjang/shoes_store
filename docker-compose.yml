@@ -1,4 +1,4 @@
-version: '3.8'
+# Dokumen Docker Compose - Shoes Store Proyek
 
 services:
   db:
@@ -16,6 +16,13 @@ services:
     volumes:
       # Menyimpan data database agar tidak hilang saat container dimatikan
       - mariadb_data:/var/lib/mysql
+    healthcheck:
+      # Cek apakah MariaDB sudah benar-benar siap menerima koneksi
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   app:
     build: ./backend
@@ -24,7 +31,17 @@ services:
       - "8000"
     ports:
       - "8000:8000"
+    env_file:
+      - ./backend/.env
     restart: always
+    depends_on:
+      db:
+        # Backend hanya start SETELAH MariaDB healthy (bukan sekedar container jalan)
+        condition: service_healthy
+    volumes:
+      # Persisting uploaded files (bukti bayar, foto profil, review) ke host
+      # agar tidak hilang saat container di-rebuild
+      - ./backend/uploads:/app/uploads
 
   # Service 2: Cloudflare Tunnel
   tunnel:

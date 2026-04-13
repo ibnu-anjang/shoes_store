@@ -1,0 +1,35 @@
+{
+  "mcpServers": {
+    "context7": {
+      "enabled": true,
+      "scope": "project"
+    },
+    "filesystem": {
+      "enabled": true,
+      "scope": "project"
+    },
+    "github": {
+      "enabled": true,
+      "scope": "project"
+    },
+    "ide": {
+      "enabled": true,
+      "scope": "project"
+    },
+    "TestSprite": {
+      "enabled": false
+    },
+    "claude_ai_Gmail": {
+      "enabled": false
+    },
+    "claude_ai_Google_Calendar": {
+      "enabled": false
+    },
+    "playwright": {
+      "enabled": false
+    },
+    "brave-search": {
+      "enabled": false
+    }
+  }
+}
