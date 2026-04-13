@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shoes_store/widgets/full_screen_viewer.dart';
+import 'package:shoes_store/widgets/fullScreenViewer.dart';
+import '../../../widgets/smartImage.dart';
 
 class MyImageSlider extends StatelessWidget {
   final Function(int) onChange;
@@ -15,13 +16,14 @@ class MyImageSlider extends StatelessWidget {
     return SizedBox(
       height: 250,
       child: PageView.builder(
+        itemCount: 1, // Batasi jumlah gambar agar tidak bisa digeser tanpa henti
         onPageChanged: onChange,
         itemBuilder: (context, index) {
           return GestureDetector(
-            onTap: () => FullScreenViewer.show(context, AssetImage(image)),
+            onTap: () => FullScreenViewer.show(context, image),
             child: Hero(
               tag: image,
-              child: Image.asset(image),
+              child: SmartImage(url: image),
             ),
           );
         },

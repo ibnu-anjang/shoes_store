@@ -7,12 +7,12 @@ import 'package:shoes_store/screens/cart/checkoutScreen.dart';
 
 class AddToCart extends StatefulWidget {
   final Product product;
-  final String selectedSize;
+  final ProductSku selectedSku;
   final Color selectedColor;
   const AddToCart({
     super.key,
     required this.product,
-    required this.selectedSize,
+    required this.selectedSku,
     required this.selectedColor,
   });
 
@@ -22,6 +22,7 @@ class AddToCart extends StatefulWidget {
 
 class _AddToCartState extends State<AddToCart> {
   int currentIndex = 1;
+  bool _isAdding = false;
 
   @override
   Widget build(BuildContext context) {
@@ -83,23 +84,36 @@ class _AddToCartState extends State<AddToCart> {
             Expanded(
               child: Row(
                 children: [
-                  // Add to Cart
+                  // Add to Cart (Remote)
                   Expanded(
                     child: GestureDetector(
-                      onTap: () {
-                        provider.addToCart(
-                          widget.product,
-                          widget.selectedSize,
-                          widget.selectedColor,
-                          currentIndex,
-                        );
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("Ditambahkan ke Keranjang!", style: TextStyle(fontWeight: FontWeight.bold)),
-                            duration: Duration(seconds: 1),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
+                      onTap: _isAdding ? null : () async {
+                        setState(() => _isAdding = true);
+                        try {
+                           // We need the full product list to refresh Provider properly locally. 
+                           // For now we pass a dummy empty list if we assume Provider will fetch its own. 
+                           // Actually addToCartRemote needs allProducts to rebuild local state correctly.
+                           // Simpler: Just refresh.
+                           await provider.addToCartRemote(widget.selectedSku, currentIndex, []);
+                           if (!mounted) return;
+                           ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Ditambahkan ke Keranjang!", style: TextStyle(fontWeight: FontWeight.bold)),
+                              duration: Duration(seconds: 1),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        } catch (e) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text("Gagal: $e", style: const TextStyle(fontWeight: FontWeight.bold)),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        } finally {
+                          if (mounted) setState(() => _isAdding = false);
+                        }
                       },
                       child: Container(
                         height: 45,
@@ -108,10 +122,12 @@ class _AddToCartState extends State<AddToCart> {
                           borderRadius: BorderRadius.circular(50),
                         ),
                         alignment: Alignment.center,
-                        child: const Text(
-                          "Cart",
-                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                        ),
+                        child: _isAdding 
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Text(
+                              "Cart",
+                              style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                            ),
                       ),
                     ),
                   ),
@@ -121,10 +137,10 @@ class _AddToCartState extends State<AddToCart> {
                     flex: 2,
                     child: GestureDetector(
                       onTap: () {
+                        // Create a buy now item with the correct SKU
                         final buyNowItem = CartItem(
                           product: widget.product,
-                          selectedSize: widget.selectedSize,
-                          selectedColor: widget.selectedColor,
+                          sku: widget.selectedSku,
                           quantity: currentIndex,
                         );
                         

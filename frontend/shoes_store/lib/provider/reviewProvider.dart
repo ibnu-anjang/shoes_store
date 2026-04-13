@@ -1,7 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shoes_store/services/apiService.dart';
 
 class ReviewItem {
   final String id;
@@ -37,83 +36,117 @@ class ReviewItem {
 
   factory ReviewItem.fromJson(Map<String, dynamic> json) {
     return ReviewItem(
-      id: json['id'],
-      productId: json['productId'],
-      userId: json['userId'] ?? json['userName'], // Fallback for old data
-      userName: json['userName'],
-      rating: (json['rating'] as num).toDouble(),
-      comment: json['comment'],
-      date: DateTime.parse(json['date']),
-      imagePath: json['imagePath'],
+      id: json['id'].toString(),
+      productId: json['product_id']?.toString() ?? json['productId']?.toString() ?? '0',
+      userId: json['user_id']?.toString() ?? json['userId']?.toString() ?? '0',
+      userName: json['username'] ?? json['userName'] ?? (json['user_id'] != null ? "User #${json['user_id']}" : 'Pengguna'),
+      rating: (json['rating'] as num?)?.toDouble() ?? 5.0,
+      comment: json['comment'] ?? '',
+      date: json['date'] != null ? DateTime.parse(json['date']) : DateTime.now(),
+      imagePath: json['image_path'] ?? json['imagePath'],
     );
   }
 }
 
 class ReviewProvider extends ChangeNotifier {
-  Map<String, List<ReviewItem>> _reviews = {};
-  bool _isLoading = true;
+  final Map<String, List<ReviewItem>> _reviews = {};
+  bool _isLoading = false;
+  String? _error;
 
   Map<String, List<ReviewItem>> get reviews => _reviews;
   bool get isLoading => _isLoading;
+  String? get error => _error;
 
-  ReviewProvider() {
-    _loadReviews();
-  }
+  ReviewProvider();
 
   static ReviewProvider of(BuildContext context, {bool listen = true}) {
     return Provider.of<ReviewProvider>(context, listen: listen);
   }
 
-  Future<void> _loadReviews() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? reviewsJson = prefs.getString('local_reviews');
-    
-    if (reviewsJson != null) {
-      final Map<String, dynamic> decoded = jsonDecode(reviewsJson);
-      _reviews = decoded.map((key, value) {
-        return MapEntry(
-          key,
-          (value as List).map((item) => ReviewItem.fromJson(item)).toList(),
-        );
-      });
-    }
-    _isLoading = false;
+  Future<void> loadProductReviews(String productId) async {
+    _isLoading = true;
+    _error = null;
     notifyListeners();
-  }
-
-  Future<void> _saveReviews() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String encoded = jsonEncode(_reviews.map((key, value) {
-      return MapEntry(key, value.map((item) => item.toJson()).toList());
-    }));
-    await prefs.setString('local_reviews', encoded);
-  }
-
-  void addReview(ReviewItem review) {
-    if (!_reviews.containsKey(review.productId)) {
-      _reviews[review.productId] = [];
+    try {
+      final reviewsJson = await ApiService.getReviews(int.parse(productId));
+      _reviews[productId] = reviewsJson.map((item) => ReviewItem.fromJson(item)).toList();
+    } catch (e) {
+      _error = "Gagal memuat ulasan";
+      debugPrint("Gagal load reviews produk $productId: $e");
+      _reviews.putIfAbsent(productId, () => []);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
+  }
+
+  /// Tambah review dengan optimistic insert + rollback jika server gagal.
+  Future<void> addReview(ReviewItem review) async {
+    _reviews.putIfAbsent(review.productId, () => []);
     _reviews[review.productId]!.insert(0, review);
-    _saveReviews();
     notifyListeners();
+
+    try {
+      await ApiService.addReview({
+        "id": review.id,
+        "product_id": int.parse(review.productId),
+        "rating": review.rating,
+        "comment": review.comment,
+        "image_path": review.imagePath,
+      });
+      // Refresh dari server untuk sinkronisasi data
+      await loadProductReviews(review.productId);
+    } catch (e) {
+      // Rollback optimistic insert
+      _reviews[review.productId]!.removeWhere((r) => r.id == review.id);
+      _error = "Gagal mengirim ulasan";
+      debugPrint("Gagal kirim review ke server, rollback: $e");
+      notifyListeners();
+      rethrow;
+    }
   }
 
-  void updateReview(ReviewItem review) {
+  Future<void> updateReview(ReviewItem review) async {
     if (_reviews.containsKey(review.productId)) {
       final index = _reviews[review.productId]!.indexWhere((item) => item.id == review.id);
       if (index != -1) {
+        final old = _reviews[review.productId]![index];
         _reviews[review.productId]![index] = review;
-        _saveReviews();
         notifyListeners();
+        try {
+          await ApiService.updateReview({
+            "id": review.id,
+            "rating": review.rating,
+            "comment": review.comment,
+            "image_path": review.imagePath,
+          });
+          await loadProductReviews(review.productId);
+        } catch (e) {
+          _reviews[review.productId]![index] = old;
+          _error = "Gagal mengupdate ulasan";
+          notifyListeners();
+          rethrow;
+        }
       }
     }
   }
 
-  void deleteReview(String productId, String reviewId) {
+  Future<void> deleteReview(String productId, String reviewId) async {
     if (_reviews.containsKey(productId)) {
-      _reviews[productId]!.removeWhere((item) => item.id == reviewId);
-      _saveReviews();
+      final idx = _reviews[productId]!.indexWhere((r) => r.id == reviewId);
+      if (idx == -1) return;
+      final old = _reviews[productId]![idx];
+      _reviews[productId]!.removeAt(idx);
       notifyListeners();
+      try {
+        await ApiService.deleteReview(reviewId);
+        await loadProductReviews(productId);
+      } catch (e) {
+        _reviews[productId]!.insert(idx, old);
+        _error = "Gagal menghapus ulasan";
+        notifyListeners();
+        rethrow;
+      }
     }
   }
 
@@ -125,15 +158,19 @@ class ReviewProvider extends ChangeNotifier {
     final productReviews = _reviews[productId] ?? [];
     if (productReviews.isEmpty) return initialRate;
 
-    // Logic: Combine initial mock rating (assumed from 5 reviews) with new reviews
-    // This makes the transition feel real (like Shopee/Tokped)
-    double totalStars = initialRate * 5; 
+    // Gabungkan rating awal (diasumsikan dari 5 review) dengan review baru
+    double totalStars = initialRate * 5;
     int totalCount = 5 + productReviews.length;
-
     for (var review in productReviews) {
       totalStars += review.rating;
     }
-
     return totalStars / totalCount;
+  }
+
+  /// Wipe semua data saat logout agar tidak bocor ke akun berikutnya.
+  void clearReviews() {
+    _reviews.clear();
+    _error = null;
+    notifyListeners();
   }
 }

@@ -1,56 +1,61 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shoes_store/models/productModel.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:shoes_store/constant.dart';
+import 'package:shoes_store/services/apiService.dart';
 
 class FavoriteProvider extends ChangeNotifier {
   final List<Product> _favorites = [];
-  List<Product> get favorites => _favorites;
-  String _currentUsername = "Shoes Store User"; // Ambil dari UserProvider aslinya nanti
+  bool _isLoading = false;
+  String? _error;
 
-  // Load favorit dari database saat start
-  Future<void> fetchFavorites(String username) async {
-    _currentUsername = username;
+  List<Product> get favorites => _favorites;
+  bool get isLoading => _isLoading;
+  String? get error => _error;
+
+  FavoriteProvider() {
+    loadFavorites();
+  }
+
+  Future<void> loadFavorites() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
     try {
-      final response = await http.get(Uri.parse("$kBaseUrl/favorites?username=$username"));
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
-        _favorites.clear();
-        _favorites.addAll(data.map((e) => Product.fromJson(e)).toList());
-        notifyListeners();
-      }
+      final list = await ApiService.getFavorites();
+      _favorites.clear();
+      _favorites.addAll(list);
     } catch (e) {
-      debugPrint("Gagal load favorit: $e");
+      _error = "Gagal memuat favorit";
+      debugPrint("Error loading favorites: $e");
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
+  /// Toggle favorit dengan optimistic update + rollback jika API gagal.
   void toggleFavorite(Product product) async {
-    // Alur Skakmat: Langsung tembak API Backend menggunakan ID yang baru kita buat
-    try {
-      final response = await http.post(
-        Uri.parse("$kBaseUrl/favorites?username=$_currentUsername"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"product_id": product.id}),
-      );
+    final wasInFavorites = _favorites.any((e) => e.id == product.id);
 
-      if (response.statusCode == 200) {
-        if (_favorites.any((e) => e.id == product.id)) {
-          _favorites.removeWhere((e) => e.id == product.id);
-        } else {
-          _favorites.add(product);
-        }
-        notifyListeners();
-      }
+    // Optimistic update
+    if (wasInFavorites) {
+      _favorites.removeWhere((e) => e.id == product.id);
+    } else {
+      _favorites.add(product);
+    }
+    notifyListeners();
+
+    try {
+      await ApiService.toggleFavorite(product.id);
     } catch (e) {
-       // Fallback lokal jika backend sedang tidak terjangkau
-       if (_favorites.any((e) => e.id == product.id)) {
-         _favorites.removeWhere((e) => e.id == product.id);
-       } else {
-         _favorites.add(product);
-       }
-       notifyListeners();
+      // Rollback jika gagal
+      if (wasInFavorites) {
+        _favorites.add(product);
+      } else {
+        _favorites.removeWhere((f) => f.id == product.id);
+      }
+      debugPrint("Gagal toggle favorit, rollback: $e");
+      notifyListeners();
     }
   }
 
@@ -58,13 +63,14 @@ class FavoriteProvider extends ChangeNotifier {
     return _favorites.any((e) => e.id == product.id);
   }
 
-  static FavoriteProvider of(
-    BuildContext context, {
-    bool listen = true,
-  }) {
-    return Provider.of<FavoriteProvider>(
-      context,
-      listen: listen
-    );
+  /// Wipe semua data saat logout agar tidak bocor ke akun berikutnya.
+  void clearFavorites() {
+    _favorites.clear();
+    _error = null;
+    notifyListeners();
+  }
+
+  static FavoriteProvider of(BuildContext context, {bool listen = true}) {
+    return Provider.of<FavoriteProvider>(context, listen: listen);
   }
 }

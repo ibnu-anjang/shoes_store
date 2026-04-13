@@ -38,7 +38,7 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
     super.dispose();
   }
 
-  void _saveAddress() {
+  Future<void> _saveAddress() async {
     if (_formKey.currentState!.validate()) {
       final provider = AddressProvider.of(context, listen: false);
       final newAddress = Address(
@@ -51,11 +51,12 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
       );
 
       if (widget.address == null) {
-        provider.addAddress(newAddress);
+        await provider.addAddress(newAddress);
       } else {
-        provider.updateAddress(widget.address!.id, newAddress);
+        await provider.updateAddress(widget.address!.id, newAddress);
       }
 
+      if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Alamat berhasil disimpan!'), backgroundColor: Colors.green),
@@ -141,7 +142,12 @@ class _AddAddressScreenState extends State<AddAddressScreen> {
         controller: controller,
         maxLines: maxLines,
         keyboardType: isPhone ? TextInputType.phone : TextInputType.text,
-        validator: (value) => value == null || value.isEmpty ? 'Data tidak boleh kosong' : null,
+        validator: (value) {
+          if (value == null || value.isEmpty) return 'Data tidak boleh kosong';
+          if (isPhone && !RegExp(r'^[0-9]+$').hasMatch(value)) return 'Hanya boleh berisi angka';
+          if (isPhone && value.length < 10) return 'Minimal 10 digit angka';
+          return null;
+        },
         decoration: InputDecoration(
           labelText: label,
           prefixIcon: Icon(icon, color: kprimaryColor),

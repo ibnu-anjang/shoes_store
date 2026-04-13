@@ -5,6 +5,7 @@ enum OrderStatus {
   diproses,
   dalamPengiriman,
   diterima,
+  dibatalkan,
 }
 
 class Order {
@@ -13,6 +14,7 @@ class Order {
   final double subtotal;
   final double ongkir;
   final double total;
+  final int uniqueCode;
   final String alamat;
   final String nomorWA;
   final DateTime tanggal;
@@ -27,6 +29,7 @@ class Order {
     required this.subtotal,
     required this.ongkir,
     required this.total,
+    this.uniqueCode = 0,
     required this.alamat,
     required this.nomorWA,
     required this.tanggal,
@@ -46,6 +49,8 @@ class Order {
         return 'Dalam Pengiriman';
       case OrderStatus.diterima:
         return 'Paket Diterima';
+      case OrderStatus.dibatalkan:
+        return 'Pesanan Dibatalkan';
     }
   }
 
@@ -59,6 +64,8 @@ class Order {
         return '🚚';
       case OrderStatus.diterima:
         return '✅';
+      case OrderStatus.dibatalkan:
+        return '❌';
     }
   }
 }

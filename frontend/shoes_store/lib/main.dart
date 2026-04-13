@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import 'provider/cartProvider.dart';
 import 'provider/favoriteProvider.dart';
 import 'provider/addressProvider.dart';
@@ -9,12 +10,23 @@ import 'screens/navBar.dart';
 import 'screens/auth/loginScreen.dart';
 import 'package:provider/provider.dart';
 
-import 'services/auth_service.dart';
+import 'services/authService.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Globals error handler to prevent sudden force quit (Shopee-like resilience)
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    debugPrint("Flutter Error Caught: ${details.exception}");
+  };
+
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint("Async Error Caught: $error");
+    return true; // prevent unexpected app crash
+  };
 
   // Check for existing token (graceful — tidak crash kalau backend mati)
   Widget initialHome;
@@ -50,6 +62,14 @@ class MyApp extends StatelessWidget {
     child: MaterialApp(
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
+      scrollBehavior: const MaterialScrollBehavior().copyWith(
+        dragDevices: {
+          PointerDeviceKind.mouse,
+          PointerDeviceKind.touch,
+          PointerDeviceKind.stylus,
+          PointerDeviceKind.unknown,
+        },
+      ),
       theme: ThemeData(
         // textTheme: GoogleFonts.mulishTextTheme(),
       ),

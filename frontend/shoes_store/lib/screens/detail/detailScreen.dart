@@ -19,19 +19,20 @@ class _DetailScreenState extends State<DetailScreen> {
   int currentImage = 0;
   int currentColor = 1;
   int currentSize = 0;
-  List<String> sizes = ["38", "39", "40", "41", "42"];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kcontentColor,
-      floatingActionButton: AddToCart(
-        product: widget.product,
-        selectedSize: sizes[currentSize],
-        selectedColor: widget.product.colors.isNotEmpty
-            ? widget.product.colors[currentColor < widget.product.colors.length ? currentColor : 0]
-            : Colors.black,
-      ),
+      floatingActionButton: widget.product.skus.isNotEmpty 
+        ? AddToCart(
+            product: widget.product,
+            selectedSku: widget.product.skus[currentSize],
+            selectedColor: widget.product.colors.isNotEmpty
+                ? widget.product.colors[currentColor < widget.product.colors.length ? currentColor : 0]
+                : Colors.black,
+          )
+        : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       body: SafeArea(
         child: Column(
@@ -51,10 +52,12 @@ class _DetailScreenState extends State<DetailScreen> {
                     ),
 
                     const SizedBox(height: 10),
+                    // Hanya tampilkan dots jika ada lebih dari 1 gambar (dinamis)
+                    if (1 > 1) 
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: List.generate(
-                        5,
+                        1,
                         (index) => AnimatedContainer(
                           duration: const Duration(milliseconds: 300),
                           width: currentImage == index ? 15 : 8,
@@ -85,7 +88,12 @@ class _DetailScreenState extends State<DetailScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          ItemDetails(product: widget.product),
+                          ItemDetails(
+                            product: widget.product,
+                            selectedSku: widget.product.skus.isNotEmpty
+                                ? widget.product.skus[currentSize]
+                                : null,
+                          ),
                           const SizedBox(height: 20),
                           const Text(
                             "Color",
@@ -110,26 +118,22 @@ class _DetailScreenState extends State<DetailScreen> {
                                   duration: const Duration(milliseconds: 300),
                                   width: 40,
                                   height: 40,
-                                  margin: const EdgeInsets.only(right: 10),
+                                  margin: const EdgeInsets.only(right: 15),
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: currentColor == index
-                                        ? Colors.white
-                                        : widget.product.colors[index],
+                                    color: widget.product.colors[index],
                                     border: currentColor == index
                                         ? Border.all(
-                                            color: widget.product.colors[index],
+                                            color: Colors.black,
+                                            width: 3,
                                           )
-                                        : null,
-                                  ),
-                                  padding: currentColor == index
-                                      ? const EdgeInsets.all(2)
-                                      : null,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: widget.product.colors[index],
-                                      shape: BoxShape.circle,
-                                    ),
+                                        : Border.all(
+                                            color: Colors.grey.shade300,
+                                            width: 1,
+                                          ),
+                                    boxShadow: currentColor == index 
+                                      ? [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))]
+                                      : [],
                                   ),
                                 ),
                               ),
@@ -150,7 +154,7 @@ class _DetailScreenState extends State<DetailScreen> {
                           Wrap(
                             spacing: 10,
                             children: List.generate(
-                              sizes.length,
+                              widget.product.skus.length,
                               (index) => GestureDetector(
                                 onTap: () {
                                   setState(() {
@@ -177,7 +181,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                         : [],
                                   ),
                                   child: Text(
-                                    sizes[index],
+                                    widget.product.skus[index].variantName,
                                     style: TextStyle(
                                       color: currentSize == index
                                           ? Colors.white
@@ -193,7 +197,7 @@ class _DetailScreenState extends State<DetailScreen> {
                           const SizedBox(height: 25),
 
                            Description(
-                             productId: widget.product.title,
+                             productId: widget.product.id.toString(),
                              description: widget.product.description,
                              specification: widget.product.specification,
                              initialRate: widget.product.rate,

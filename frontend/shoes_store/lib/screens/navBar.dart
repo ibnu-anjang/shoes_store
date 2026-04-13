@@ -1,57 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:shoes_store/constant.dart';
 import 'package:shoes_store/screens/cart/cartScreen.dart';
+import 'package:shoes_store/screens/favorite/favoriteScreen.dart';
 import 'package:shoes_store/screens/home/homeScreen.dart';
-import 'package:shoes_store/screens/profile/profile.dart';
+import 'package:shoes_store/screens/profile/profileScreen.dart';
 import 'package:shoes_store/screens/order/orderListScreen.dart';
-import 'package:shoes_store/screens/favorite/favorite.dart';
-import 'package:shoes_store/screens/chatbot/chatBotScreen.dart';
 
 class BottomNavBar extends StatefulWidget {
-  const BottomNavBar({super.key});
+  final int initialIndex;
+  const BottomNavBar({super.key, this.initialIndex = 0});
 
   @override
   State<BottomNavBar> createState() => _BottomNavBarState();
 }
 
 class _BottomNavBarState extends State<BottomNavBar> {
-  int currentIndex = 0;
-  
+  late int currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    currentIndex = widget.initialIndex;
+  }
+
   final List<Widget> screens = [
     const HomeScreen(),
     const OrderListScreen(),
-    const AssistantChatScreen(),
+    const FavoriteScreen(),
     const CartScreen(),
-    const Profile(),
+    const ProfileScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          "Shoes Store",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-            fontSize: 22,
-          ),
-        ),
-        actions: [
-          IconButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const Favorite()),
-              );
-            },
-            icon: const Icon(Icons.favorite_border, color: Colors.black),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
       body: screens[currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: currentIndex,
@@ -62,7 +44,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Beranda"),
           BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: "Pesanan"),
-          BottomNavigationBarItem(icon: Icon(Icons.smart_toy), label: "ChatBot"),
+          BottomNavigationBarItem(icon: Icon(Icons.favorite_border), label: "Favorit"),
           BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: "Keranjang"),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profil"),
         ],

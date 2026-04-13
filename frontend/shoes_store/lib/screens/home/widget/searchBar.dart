@@ -32,15 +32,17 @@ class MySearchBar extends StatelessWidget {
               border: InputBorder.none,),
             ),
           ),
-          Container(
-            height: 25,
-            width: 1.5,
-            color: Colors.grey,
-          ),
-          IconButton(onPressed: onFilterTap, 
-          icon: const Icon(
-            Icons.tune,
-            color: Colors.grey,))
+          if (onFilterTap != null) ...[
+            Container(
+              height: 25,
+              width: 1.5,
+              color: Colors.grey,
+            ),
+            IconButton(
+              onPressed: onFilterTap,
+              icon: const Icon(Icons.tune, color: Colors.grey),
+            ),
+          ]
         ],
       ),
     );  

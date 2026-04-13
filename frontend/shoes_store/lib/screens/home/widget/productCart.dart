@@ -3,6 +3,7 @@ import 'package:shoes_store/models/productModel.dart';
 import 'package:shoes_store/constant.dart';
 import 'package:shoes_store/provider/favoriteProvider.dart';
 import 'package:shoes_store/screens/detail/detailScreen.dart';
+import '../../../widgets/smartImage.dart';
 
 
 class ProductCard extends StatelessWidget {
@@ -40,13 +41,11 @@ class ProductCard extends StatelessWidget {
                 Center(
                   child: Hero(
                     tag: '${product.title}_${product.image}_${product.price}',
-                    child: Image.asset(
-                      product.image,
+                    child: SmartImage(
+                      url: product.image,
                       width: 150,
                       height: 150,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.broken_image, size: 100, color: Colors.grey),
                     ),
                   ),
                 ),
@@ -61,31 +60,16 @@ class ProductCard extends StatelessWidget {
                 ),
                 ),
                 const SizedBox(height: 10,),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [Text(
-                  "\$${product.price}",
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 17,
+                Padding(
+                  padding: const EdgeInsets.only(left: 10, bottom: 8),
+                  child: Text(
+                    formatRupiah(product.price),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 17,
+                    ),
                   ),
-                  ),
-                  Row(
-                    children: List.generate(
-                      product.colors.length,
-                      (index) => Container(
-                        width: 18,
-                        height: 18,
-                        margin: const EdgeInsets.only(right: 4),
-                        decoration: BoxDecoration(
-                          color: product.colors[index],
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                  ),
-                  ),
-                  ],
-                  ),
+                ),
               ],
             ),
           ),

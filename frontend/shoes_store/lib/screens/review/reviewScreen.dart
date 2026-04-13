@@ -8,6 +8,7 @@ import 'package:shoes_store/provider/orderProvider.dart';
 import 'package:shoes_store/provider/reviewProvider.dart';
 import 'package:shoes_store/provider/userProvider.dart';
 import 'package:shoes_store/screens/navBar.dart';
+import '../../widgets/smartImage.dart';
 
 class ReviewScreen extends StatefulWidget {
   final Order order;
@@ -84,35 +85,46 @@ class _ReviewScreenState extends State<ReviewScreen> {
     }
   }
 
-  void _submitReview() {
-    if (_selectedRating == 0) return;
+  bool _isSubmitting = false;
+
+  Future<void> _submitReview() async {
+    if (_selectedRating == 0 || _isSubmitting) return;
+    setState(() => _isSubmitting = true);
 
     final reviewProvider = ReviewProvider.of(context, listen: false);
     final orderProvider = OrderProvider.of(context, listen: false);
     final userProvider = UserProvider.of(context, listen: false);
-    
+
     final review = ReviewItem(
-      id: widget.existingReview?.id ??
-          DateTime.now().millisecondsSinceEpoch.toString(),
-      productId: widget.order.items.first.product.title,
-      userId: userProvider.userId, // Use stable ID
-      userName: userProvider.userName, 
+      id: widget.existingReview?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      productId: widget.order.items.first.product.id.toString(),
+      userId: userProvider.userId,
+      userName: userProvider.userName,
       rating: _selectedRating.toDouble(),
       comment: _reviewController.text,
       date: DateTime.now(),
       imagePath: _tempImagePath,
     );
 
-    if (widget.existingReview != null) {
-      reviewProvider.updateReview(review);
-    } else {
-      reviewProvider.addReview(review);
-      orderProvider.markAsReviewed(widget.order.id);
+    try {
+      if (widget.existingReview != null) {
+        await reviewProvider.updateReview(review);
+      } else {
+        await reviewProvider.addReview(review);
+        orderProvider.markAsReviewed(widget.order.id);
+      }
+      if (mounted) setState(() => _isSubmitted = true);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
-
-    setState(() {
-      _isSubmitted = true;
-    });
   }
 
   @override
@@ -179,22 +191,11 @@ class _ReviewScreenState extends State<ReviewScreen> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(10),
-                            child: Image.asset(
-                              item.product.image,
+                            child: SmartImage(
+                              url: item.product.image,
                               width: 50,
                               height: 50,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  Container(
-                                width: 50,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  color: kcontentColor,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(Icons.image,
-                                    color: Colors.grey, size: 25),
-                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -466,7 +467,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
             width: double.infinity,
             height: 55,
             child: ElevatedButton(
-              onPressed: _selectedRating == 0 ? null : _submitReview,
+              onPressed: (_selectedRating == 0 || _isSubmitting) ? null : _submitReview,
               style: ElevatedButton.styleFrom(
                 backgroundColor: kprimaryColor,
                 disabledBackgroundColor: Colors.grey.shade300,
@@ -474,14 +475,12 @@ class _ReviewScreenState extends State<ReviewScreen> {
                   borderRadius: BorderRadius.circular(15),
                 ),
               ),
-              child: const Text(
-                'Kirim Review',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              child: _isSubmitting
+                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text(
+                      'Kirim Review',
+                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
             ),
           ),
 

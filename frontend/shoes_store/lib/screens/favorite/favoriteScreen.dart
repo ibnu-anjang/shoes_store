@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:shoes_store/constant.dart';
 import 'package:shoes_store/provider/favoriteProvider.dart';
+import '../../widgets/smartImage.dart';
 
-class Favorite extends StatefulWidget {
-  const Favorite({super.key});
+class FavoriteScreen extends StatefulWidget {
+  const FavoriteScreen({super.key});
 
   @override
-  State<Favorite> createState() => _FavoriteState();
+  State<FavoriteScreen> createState() => _FavoriteScreenState();
 }
 
-class _FavoriteState extends State<Favorite> {
+class _FavoriteScreenState extends State<FavoriteScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = FavoriteProvider.of(context);
@@ -53,7 +54,7 @@ class _FavoriteState extends State<Favorite> {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             padding: const EdgeInsets.all(10),
-                            child: Image.asset(favoritItem.image),
+                            child: SmartImage(url: favoritItem.image),
                           ),
                           const SizedBox(width: 10,),
                           Column(
@@ -77,7 +78,7 @@ class _FavoriteState extends State<Favorite> {
                               ),
                               const SizedBox(height: 8,),
                               Text(
-                                "\$${favoritItem.price}",
+                                formatRupiah(favoritItem.price),
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 15,
@@ -95,20 +96,18 @@ class _FavoriteState extends State<Favorite> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          IconButton(onPressed: () {
-                            finalList.removeAt(index);
-                            setState(() {
-                              
-                            });
-                          }, 
-                          icon: const Icon(
-                            Icons.delete,
-                            color: Colors.red,
-                            size: 25,
-                          ),
+                          IconButton(
+                            onPressed: () {
+                              provider.toggleFavorite(favoritItem);
+                            },
+                            icon: const Icon(
+                              Icons.delete,
+                              color: Colors.red,
+                              size: 25,
+                            ),
                           ),
                         ],
-                    ),
+                      ),
                     ),
                 ],
               );

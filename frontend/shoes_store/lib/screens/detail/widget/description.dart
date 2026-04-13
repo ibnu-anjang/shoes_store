@@ -5,6 +5,8 @@ import 'package:shoes_store/provider/reviewProvider.dart';
 import 'package:shoes_store/provider/userProvider.dart';
 import 'package:shoes_store/provider/orderProvider.dart';
 import 'package:shoes_store/screens/review/reviewScreen.dart';
+import 'package:shoes_store/services/apiService.dart';
+import '../../../widgets/smartImage.dart';
 
 class Description extends StatefulWidget {
   final String productId;
@@ -125,7 +127,7 @@ class _DescriptionState extends State<Description> {
                                     // Cari order yang sesuai produk ini
                                     try {
                                       final order = orderProvider.orders.firstWhere(
-                                        (o) => o.items.any((item) => item.product.title == widget.productId)
+                                        (o) => o.items.any((item) => item.product.id.toString() == widget.productId)
                                       );
                                       Navigator.push(
                                         context,
@@ -198,8 +200,8 @@ class _DescriptionState extends State<Description> {
                                 children: [
                                   Center(
                                     child: InteractiveViewer(
-                                      child: Image.file(
-                                        File(review.imagePath!),
+                                      child: SmartImage(
+                                        url: ApiService.normalizeImage(review.imagePath!),
                                         fit: BoxFit.contain,
                                       ),
                                     ),
@@ -219,17 +221,11 @@ class _DescriptionState extends State<Description> {
                         },
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(10),
-                          child: Image.file(
-                            File(review.imagePath!),
+                          child: SmartImage(
+                            url: ApiService.normalizeImage(review.imagePath!),
                             width: 100,
                             height: 100,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Container(
-                              width: 100,
-                              height: 100,
-                              color: Colors.grey.shade300,
-                              child: const Icon(Icons.broken_image, color: Colors.grey),
-                            ),
                           ),
                         ),
                       ),

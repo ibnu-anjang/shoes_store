@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shoes_store/models/productModel.dart';
 import 'package:shoes_store/models/category.dart' as model;
 import 'package:shoes_store/screens/home/widget/imageSlider.dart';
 import 'package:shoes_store/screens/home/widget/productCart.dart';
 import 'package:shoes_store/screens/home/widget/searchBar.dart';
 import 'package:shoes_store/constant.dart';
-
-
-import 'package:shoes_store/services/product_service.dart';
+import 'package:shoes_store/screens/chatbot/chatBotScreen.dart';
+import 'package:shoes_store/provider/userProvider.dart';
+import 'package:shoes_store/services/productService.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,6 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool isLoading = true;
   String selectedCategory = "All";
   String searchQuery = "";
+  List<model.Category> dynamicCategories = [model.Category(title: "All", image: "")];
 
   @override
   void initState() {
@@ -37,6 +39,9 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         allProducts = results;
         displayedProducts = results;
+        final categoriesSet = results.map((p) => p.category).toSet();
+        dynamicCategories = [model.Category(title: "All", image: "")] 
+          ..addAll(categoriesSet.map((c) => model.Category(title: c, image: "")));
         isLoading = false;
       });
     }
@@ -54,202 +59,250 @@ class _HomeScreenState extends State<HomeScreen> {
     debugPrint("DEBUG: Filtered to ${displayedProducts.length} products (Category: $selectedCategory, Search: $searchQuery)");
   }
 
-  void _showFilterOptions() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-      ),
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "Pilih Kategori",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: model.categories.map((category) {
-                  final isSelected = selectedCategory == category.title;
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        selectedCategory = category.title;
-                        _filterProducts();
-                      });
-                      Navigator.pop(context);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: isSelected ? kprimaryColor : kcontentColor,
-                        borderRadius: BorderRadius.circular(15),
-                        border: Border.all(
-                          color: isSelected ? kprimaryColor : Colors.grey.shade300,
-                        ),
-                      ),
-                      child: Text(
-                        category.title,
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.black87,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        );
-      },
-    );
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 11) return 'Selamat Pagi';
+    if (hour < 15) return 'Selamat Siang';
+    if (hour < 18) return 'Selamat Sore';
+    return 'Selamat Malam';
   }
-  
 
   @override
   Widget build(BuildContext context) {
+    final userName = Provider.of<UserProvider>(context).userName;
+
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 10),
-              // search bar
-              MySearchBar(
-                onFilterTap: _showFilterOptions,
-                onChanged: (value) {
-                  searchQuery = value;
-                  _filterProducts();
-                },
-              ),
-              
-              // Offline Indicator Banner
-              if (!isLoading && ProductService.isOfflineData)
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.symmetric(vertical: 10),
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade100,
-                    borderRadius: BorderRadius.circular(10),
+      backgroundColor: kcontentColor,
+      body: RefreshIndicator(
+        onRefresh: _loadProducts,
+        color: kprimaryColor,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            // ── Gradient App Bar / Header ──────────────────────────────
+            SliverToBoxAdapter(
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [kprimaryColor, Color(0xFFFF8C42)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(30),
+                    bottomRight: Radius.circular(30),
+                  ),
+                ),
+                padding: const EdgeInsets.fromLTRB(20, 48, 20, 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Logo + greeting + AI button dalam satu baris
+                    Row(
+                      children: [
+                        Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.storefront_rounded, color: kprimaryColor, size: 18),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "Shoes Store",
+                                style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: 0.3),
+                              ),
+                              Text(
+                                '${_getGreeting()}, $userName 👋',
+                                style: const TextStyle(color: Colors.white70, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                        _buildHeaderBtn(
+                          Icons.smart_toy_outlined,
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AssistantChatScreen())),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    // Search bar di dalam header
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(30),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withAlpha(25),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: MySearchBar(
+                        onFilterTap: null,
+                        onChanged: (value) {
+                          searchQuery = value;
+                          _filterProducts();
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // ── Body ────────────────────────────────────────────────────
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  const SizedBox(height: 20),
+
+                  // Offline Banner
+                  if (!isLoading && ProductService.isOfflineData)
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 15),
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.orange.shade300),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.cloud_off, color: Colors.orange, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            "Mode Offline: Menampilkan data simpanan",
+                            style: TextStyle(
+                              color: Colors.orange,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // Categories
+                  SizedBox(
+                    height: 40,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: dynamicCategories.length,
+                      itemBuilder: (context, index) {
+                        final category = dynamicCategories[index];
+                        final isSelected = selectedCategory == category.title;
+                        return GestureDetector(
+                          onTap: () => setState(() {
+                            selectedCategory = category.title;
+                            _filterProducts();
+                          }),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            margin: const EdgeInsets.only(right: 10),
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            decoration: BoxDecoration(
+                              color: isSelected ? kprimaryColor : Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: isSelected
+                                  ? [BoxShadow(color: kprimaryColor.withAlpha(77), blurRadius: 8, offset: const Offset(0, 3))]
+                                  : [BoxShadow(color: Colors.black.withAlpha(13), blurRadius: 4)],
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              category.title,
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : Colors.black54,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Promo Slider
+                  ImageSlider(
+                    currentSlide: currentSlider,
+                    onChange: (value) => setState(() => currentSlider = value),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Section title
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Icon(Icons.cloud_off, color: Colors.orange),
-                      SizedBox(width: 8),
+                      const Text(
+                        "Special for You",
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                      ),
                       Text(
-                        "Mode Offline: Menampilkan data simpanan",
-                        style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
+                        "${displayedProducts.length} produk",
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                       ),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 15),
 
-              const SizedBox(height: 20),
-              
-              // Categories Section
-              SizedBox(
-                height: 40,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: model.categories.length,
-                  itemBuilder: (context, index) {
-                    final category = model.categories[index];
-                    final isSelected = selectedCategory == category.title;
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          selectedCategory = category.title;
-                          _filterProducts();
-                        });
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.only(right: 15),
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        decoration: BoxDecoration(
-                          color: isSelected ? kprimaryColor : kcontentColor,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: isSelected ? [
-                            BoxShadow(
-                              color: kprimaryColor.withOpacity(0.3),
-                              blurRadius: 5,
-                              offset: const Offset(0, 2),
-                            )
-                          ] : [],
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          category.title,
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.black54,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                  // Product Grid
+                  isLoading
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(50),
+                            child: CircularProgressIndicator(color: kprimaryColor),
                           ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
+                        )
+                      : (displayedProducts.isEmpty
+                          ? _buildEmptyState()
+                          : GridView.builder(
+                              physics: const NeverScrollableScrollPhysics(),
+                              shrinkWrap: true,
+                              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: 200,
+                                childAspectRatio: 0.68,
+                                crossAxisSpacing: 15,
+                                mainAxisSpacing: 15,
+                              ),
+                              itemCount: displayedProducts.length,
+                              itemBuilder: (context, index) =>
+                                  ProductCard(product: displayedProducts[index]),
+                            )),
 
-              const SizedBox(height: 20),
-
-              ImageSlider(
-                currentSlide: currentSlider,
-                onChange: (value) {
-                  setState(() {
-                    currentSlider = value;
-                  });
-                },
+                  const SizedBox(height: 30),
+                ]),
               ),
-              const Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "Special for You",
-                    style: TextStyle(
-                      fontSize: 25,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              // Optimized Grid
-              isLoading 
-                ? const Center(child: Padding(
-                    padding: EdgeInsets.all(50.0),
-                    child: CircularProgressIndicator(),
-                  ))
-                : (displayedProducts.isEmpty 
-                    ? _buildEmptyState()
-                    : GridView.count(
-                        physics: const NeverScrollableScrollPhysics(),
-                        shrinkWrap: true,
-                        crossAxisCount: 2,
-                        childAspectRatio: 0.78,
-                        crossAxisSpacing: 20,
-                        mainAxisSpacing: 20,
-                        children: displayedProducts.map((product) => ProductCard(product: product)).toList(),
-                      )),
-            ],
-          ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildHeaderBtn(IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Colors.white.withAlpha(51),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(icon, color: Colors.white, size: 20),
       ),
     );
   }

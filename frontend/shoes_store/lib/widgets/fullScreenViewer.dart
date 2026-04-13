@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:shoes_store/widgets/smartImage.dart';
 
 class FullScreenViewer extends StatelessWidget {
-  final ImageProvider image;
-  const FullScreenViewer({super.key, required this.image});
+  final String imageUrl;
+  const FullScreenViewer({super.key, required this.imageUrl});
 
-  static void show(BuildContext context, ImageProvider image) {
+  static void show(BuildContext context, String imageUrl) {
     showDialog(
       context: context,
-      builder: (context) => FullScreenViewer(image: image),
+      builder: (context) => FullScreenViewer(imageUrl: imageUrl),
     );
   }
 
@@ -21,8 +22,8 @@ class FullScreenViewer extends StatelessWidget {
             child: InteractiveViewer(
               minScale: 0.5,
               maxScale: 4.0,
-              child: Image(
-                image: image,
+              child: SmartImage(
+                url: imageUrl,
                 fit: BoxFit.contain,
                 width: double.infinity,
                 height: double.infinity,

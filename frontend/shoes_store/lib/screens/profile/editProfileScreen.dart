@@ -19,6 +19,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _newPasswordController;
   String? _tempImagePath;
   bool _showPassword = false;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -101,23 +102,59 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  void _saveProfile() {
-    if (_formKey.currentState!.validate()) {
-      final userProvider = UserProvider.of(context, listen: false);
-      
-      String? newPW = _newPasswordController.text.isNotEmpty ? _newPasswordController.text : null;
-      
-      userProvider.updateProfile(
-        name: _nameController.text,
-        email: _emailController.text,
-        password: newPW,
-        imagePath: _tempImagePath,
-      );
+  ImageProvider? _getAvatarImage() {
+    // Priority: 1) temp cropped image, 2) server profile image, 3) null (show icon)
+    if (_tempImagePath != null) {
+      if (_tempImagePath!.startsWith('http')) {
+        return NetworkImage(_tempImagePath!);
+      }
+      return FileImage(File(_tempImagePath!));
+    }
+    final userProvider = UserProvider.of(context, listen: false);
+    if (userProvider.profileImagePath != null && userProvider.profileImagePath!.isNotEmpty) {
+      if (userProvider.profileImagePath!.startsWith('http')) {
+        return NetworkImage(userProvider.profileImagePath!);
+      }
+      return FileImage(File(userProvider.profileImagePath!));
+    }
+    return null; // Will show person icon
+  }
 
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profil berhasil diperbarui! 🎉'), backgroundColor: Colors.green),
-      );
+  Future<void> _saveProfile() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true;
+      });
+      
+      try {
+        final userProvider = UserProvider.of(context, listen: false);
+        
+        String? newPW = _newPasswordController.text.isNotEmpty ? _newPasswordController.text : null;
+        
+        await userProvider.updateProfile(
+          name: _nameController.text,
+          email: _emailController.text,
+          password: newPW,
+          imagePath: _tempImagePath,
+        );
+
+        if (!mounted) return;
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profil berhasil diperbarui! 🎉'), backgroundColor: Colors.green),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal memperbarui: $e'), backgroundColor: Colors.red),
+        );
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
     }
   }
 
@@ -150,10 +187,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     children: [
                       CircleAvatar(
                         radius: 60,
-                        backgroundColor: Colors.grey.shade200,
-                        backgroundImage: _tempImagePath != null
-                            ? FileImage(File(_tempImagePath!))
-                            : const AssetImage("assets/pp.png") as ImageProvider,
+                        backgroundColor: Colors.grey.shade300,
+                        backgroundImage: _getAvatarImage(),
+                        child: _getAvatarImage() == null
+                            ? const Icon(Icons.person, size: 60, color: Colors.white)
+                            : null,
                       ),
                       Positioned(
                         bottom: 0,
@@ -183,14 +221,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               
               const SizedBox(height: 40),
               ElevatedButton(
-                onPressed: _saveProfile,
+                onPressed: _isLoading ? null : _saveProfile,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kprimaryColor,
                   minimumSize: const Size(double.infinity, 60),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 ),
-                child: const Text('Simpan Perubahan', 
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                child: _isLoading 
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text('Simpan Perubahan', 
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
               ),
               const SizedBox(height: 20),
             ],

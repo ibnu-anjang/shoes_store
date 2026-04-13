@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shoes_store/models/productModel.dart';
-import 'package:shoes_store/services/auth_service.dart';
+import 'package:shoes_store/services/authService.dart';
 
 class ProductService {
   static const String _cacheKey = 'cached_products';
@@ -50,5 +50,12 @@ class ProductService {
   static Future<String?> _loadCache() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_cacheKey);
+  }
+
+  /// Hapus cache produk agar saat login berikutnya data benar-benar fresh dari API
+  static Future<void> invalidateCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_cacheKey);
+    debugPrint("DEBUG: Product cache invalidated");
   }
 }

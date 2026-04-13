@@ -3,6 +3,7 @@ import 'package:shoes_store/constant.dart';
 import 'package:shoes_store/models/orderModel.dart';
 import 'package:shoes_store/provider/orderProvider.dart';
 import 'package:shoes_store/screens/detail/detailScreen.dart';
+import '../../widgets/smartImage.dart';
 import 'package:shoes_store/screens/review/reviewScreen.dart';
 
 class OrderDetailScreen extends StatelessWidget {
@@ -48,7 +49,8 @@ class OrderDetailScreen extends StatelessWidget {
             const SizedBox(height: 15),
 
             // INTRUKSI PEMBAYARAN (Baru)
-            if (currentOrder.status == OrderStatus.menungguVerifikasi && currentOrder.paymentMethod != 'COD') ...[
+            if (currentOrder.status == OrderStatus.menungguVerifikasi &&
+                currentOrder.paymentMethod != 'COD') ...[
               _buildPaymentInstructions(currentOrder),
               const SizedBox(height: 15),
             ],
@@ -78,9 +80,9 @@ class OrderDetailScreen extends StatelessWidget {
 
             // Tombol Review (jika status = diterima)
             if (currentOrder.status == OrderStatus.diterima)
-              currentOrder.isReviewed 
-                ? _buildReviewedLabel()
-                : _buildReviewButton(context, currentOrder),
+              currentOrder.isReviewed
+                  ? _buildReviewedLabel()
+                  : _buildReviewButton(context, currentOrder),
 
             const SizedBox(height: 30),
           ],
@@ -123,7 +125,9 @@ class OrderDetailScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: order.status == OrderStatus.menungguVerifikasi ? Border.all(color: Colors.orange.shade300, width: 2) : null,
+        border: order.status == OrderStatus.menungguVerifikasi
+            ? Border.all(color: Colors.orange.shade300, width: 2)
+            : null,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -140,16 +144,26 @@ class OrderDetailScreen extends StatelessWidget {
             children: [
               const Text(
                 'Status Pesanan',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               if (order.status == OrderStatus.menungguVerifikasi)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: Colors.orange.shade100, borderRadius: BorderRadius.circular(10)),
-                  child: Text('Menunggu Pembayaran', style: TextStyle(color: Colors.orange.shade800, fontSize: 10, fontWeight: FontWeight.bold)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade100,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    'Menunggu Pembayaran',
+                    style: TextStyle(
+                      color: Colors.orange.shade800,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -157,35 +171,40 @@ class OrderDetailScreen extends StatelessWidget {
           _buildTimelineStep(
             icon: Icons.payment,
             title: 'Pesanan Dibuat',
-            subtitle: order.status == OrderStatus.menungguVerifikasi 
-              ? 'Silakan selesaikan pembayaranmu' 
-              : 'Pembayaran telah dikonfirmasi',
+            subtitle: order.status == OrderStatus.menungguVerifikasi
+                ? 'Silakan selesaikan pembayaranmu'
+                : 'Pembayaran telah dikonfirmasi',
             isActive: true,
             isCompleted: order.status != OrderStatus.menungguVerifikasi,
           ),
           _buildTimelineConnector(
-              order.status != OrderStatus.menungguVerifikasi),
+            order.status != OrderStatus.menungguVerifikasi,
+          ),
           _buildTimelineStep(
             icon: Icons.receipt_long,
             title: 'Pesanan Diproses',
             subtitle: 'Penjual sedang memproses pesananmu',
             isActive: order.status != OrderStatus.menungguVerifikasi,
-            isCompleted: order.status == OrderStatus.dalamPengiriman || order.status == OrderStatus.diterima,
+            isCompleted:
+                order.status == OrderStatus.dalamPengiriman ||
+                order.status == OrderStatus.diterima,
           ),
           _buildTimelineConnector(
-              order.status == OrderStatus.dalamPengiriman || order.status == OrderStatus.diterima),
+            order.status == OrderStatus.dalamPengiriman ||
+                order.status == OrderStatus.diterima,
+          ),
           _buildTimelineStep(
             icon: Icons.local_shipping,
             title: 'Dalam Pengiriman',
             subtitle: order.resi != null
                 ? 'No. Resi: ${order.resi}'
                 : 'Menunggu pengiriman',
-            isActive: order.status == OrderStatus.dalamPengiriman ||
+            isActive:
+                order.status == OrderStatus.dalamPengiriman ||
                 order.status == OrderStatus.diterima,
             isCompleted: order.status == OrderStatus.diterima,
           ),
-          _buildTimelineConnector(
-              order.status == OrderStatus.diterima),
+          _buildTimelineConnector(order.status == OrderStatus.diterima),
           _buildTimelineStep(
             icon: Icons.check_circle,
             title: 'Paket Diterima',
@@ -215,8 +234,14 @@ class OrderDetailScreen extends StatelessWidget {
               const Icon(Icons.info_outline, color: Colors.blue),
               const SizedBox(width: 10),
               Text(
-                order.paymentMethod == 'QRIS' ? 'Scan QRIS Pembayaran' : 'Detail Rekening Transfer',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue),
+                order.paymentMethod == 'QRIS'
+                    ? 'Scan QRIS Pembayaran'
+                    : 'Detail Rekening Transfer',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Colors.blue,
+                ),
               ),
             ],
           ),
@@ -224,25 +249,36 @@ class OrderDetailScreen extends StatelessWidget {
           if (order.paymentMethod == 'QRIS')
             Container(
               padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(15),
+              ),
               child: Image.asset(
                 'assets/images/qris_payment.png',
                 width: 200,
                 height: 200,
-                errorBuilder: (ctx, err, st) => const Icon(Icons.qr_code_2, size: 100, color: Colors.grey),
+                errorBuilder: (ctx, err, st) =>
+                    const Icon(Icons.qr_code_2, size: 100, color: Colors.grey),
               ),
             )
           else ...[
             _instructionRow('Bank', 'BCA (Modern Shoes Store)'),
             _instructionRow('No. Rekening', '7712 8890 1234'),
             _instructionRow('Atas Nama', 'PT Shoes Store Modern'),
-            _instructionRow('Total Bayar', '\$${order.total.toStringAsFixed(1)}'),
+            _instructionRow(
+              'Total Bayar',
+              formatRupiah(order.total),
+            ),
           ],
           const SizedBox(height: 15),
           const Text(
             '*Pesanan akan diproses otomatis setelah Anda melakukan pembayaran dan dikonfirmasi oleh sistem.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 11, color: Colors.blue, fontStyle: FontStyle.italic),
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.blue,
+              fontStyle: FontStyle.italic,
+            ),
           ),
         ],
       ),
@@ -255,8 +291,18 @@ class OrderDetailScreen extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.blue.shade700, fontSize: 13)),
-          Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blue.shade900)),
+          Text(
+            label,
+            style: TextStyle(color: Colors.blue.shade700, fontSize: 13),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: Colors.blue.shade900,
+            ),
+          ),
         ],
       ),
     );
@@ -279,7 +325,9 @@ class OrderDetailScreen extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: isActive ? kprimaryColor.withOpacity(0.1) : Colors.grey.shade100,
+            color: isActive
+                ? kprimaryColor.withOpacity(0.1)
+                : Colors.grey.shade100,
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: color, size: 20),
@@ -340,10 +388,7 @@ class OrderDetailScreen extends StatelessWidget {
             children: [
               Text(
                 'Nomor Resi',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.blue.shade700,
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.blue.shade700),
               ),
               Text(
                 order.resi!,
@@ -383,115 +428,111 @@ class OrderDetailScreen extends StatelessWidget {
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
           const SizedBox(height: 12),
-          ...order.items.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => DetailScreen(product: item.product),
+          ...order.items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => DetailScreen(product: item.product),
+                    ),
+                  );
+                },
+                child: Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: SmartImage(
+                        url: item.product.image,
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
                       ),
-                    );
-                  },
-                  child: Row(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.asset(
-                          item.product.image,
-                          width: 60,
-                          height: 60,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              Container(
-                            width: 60,
-                            height: 60,
-                            decoration: BoxDecoration(
-                              color: kcontentColor,
-                              borderRadius: BorderRadius.circular(12),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.product.title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
                             ),
-                            child: const Icon(Icons.image, color: Colors.grey),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.product.title,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const SizedBox(width: 6),
+                              Text(
+                                item.sku.variantName,
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 16,
-                                  height: 16,
-                                  decoration: BoxDecoration(
-                                    color: item.selectedColor,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                        color: Colors.grey.shade300, width: 1),
-                                  ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'x${item.quantity}',
+                                style: TextStyle(
+                                  color: Colors.grey.shade500,
+                                  fontSize: 12,
                                 ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Size ${item.selectedSize}',
-                                  style: TextStyle(
-                                    color: Colors.grey.shade500,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'x${item.quantity}',
-                                  style: TextStyle(
-                                    color: Colors.grey.shade500,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      Text(
-                        '\$${item.totalPrice.toStringAsFixed(1)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
+                    ),
+                    Text(
+                      formatRupiah(item.totalPrice),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              )),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildSimulateVerifyButton(
-      BuildContext context, Order order, OrderProvider provider) {
+    BuildContext context,
+    Order order,
+    OrderProvider provider,
+  ) {
     return Container(
       width: double.infinity,
       height: 55,
       margin: const EdgeInsets.only(bottom: 15),
       child: ElevatedButton.icon(
-        onPressed: () {
-          provider.updateStatus(order.id, OrderStatus.diproses);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Pembayaran Diversifikasi! (Simulasi Admin)'),
-              backgroundColor: Colors.blue,
-            ),
-          );
+        onPressed: () async {
+          try {
+            await provider.updateStatus(order.id, OrderStatus.diproses);
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Pembayaran Diverifikasi! (Simulasi Admin)'),
+                  backgroundColor: Colors.blue,
+                ),
+              );
+            }
+          } catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Gagal: ${e.toString().replaceAll("Exception: ", "")}'), backgroundColor: Colors.red),
+              );
+            }
+          }
         },
         icon: const Icon(Icons.verified_user, color: Colors.white),
         label: const Text(
@@ -538,16 +579,16 @@ class OrderDetailScreen extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.location_on_outlined,
-                  color: kprimaryColor, size: 20),
+              const Icon(
+                Icons.location_on_outlined,
+                color: kprimaryColor,
+                size: 20,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   order.alamat,
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
                 ),
               ),
             ],
@@ -555,15 +596,11 @@ class OrderDetailScreen extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(Icons.phone_outlined,
-                  color: kprimaryColor, size: 20),
+              const Icon(Icons.phone_outlined, color: kprimaryColor, size: 20),
               const SizedBox(width: 8),
               Text(
                 order.nomorWA,
-                style: TextStyle(
-                  color: Colors.grey.shade700,
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
               ),
             ],
           ),
@@ -581,7 +618,7 @@ class OrderDetailScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -589,9 +626,37 @@ class OrderDetailScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _priceRow('Subtotal', '\$${order.subtotal.toStringAsFixed(1)}'),
+          _priceRow('Subtotal', formatRupiah(order.subtotal)),
           const SizedBox(height: 8),
-          _priceRow('Ongkos Kirim', '\$${order.ongkir.toStringAsFixed(1)}'),
+          _priceRow(
+            'Ongkos Kirim',
+            order.ongkir == 0 ? 'Gratis' : formatRupiah(order.ongkir),
+          ),
+          if (order.uniqueCode > 0) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Kode Unik',
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                    ),
+                    const SizedBox(width: 6),
+                    Tooltip(
+                      message: 'Angka unik untuk identifikasi pembayaranmu',
+                      child: Icon(Icons.info_outline, size: 14, color: Colors.grey.shade400),
+                    ),
+                  ],
+                ),
+                Text(
+                  '+${order.uniqueCode}',
+                  style: TextStyle(fontSize: 14, color: Colors.orange.shade700),
+                ),
+              ],
+            ),
+          ],
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 10),
             child: Divider(height: 1),
@@ -600,11 +665,11 @@ class OrderDetailScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Total',
+                'Total Bayar',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               Text(
-                '\$${order.total.toStringAsFixed(1)}',
+                formatRupiah(order.total),
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
@@ -622,14 +687,20 @@ class OrderDetailScreen extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
+        Text(
+          label,
+          style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+        ),
         Text(value, style: const TextStyle(fontSize: 14)),
       ],
     );
   }
 
   Widget _buildConfirmButton(
-      BuildContext context, Order order, OrderProvider provider) {
+    BuildContext context,
+    Order order,
+    OrderProvider provider,
+  ) {
     return SizedBox(
       width: double.infinity,
       height: 55,
@@ -639,25 +710,56 @@ class OrderDetailScreen extends StatelessWidget {
             context: context,
             builder: (ctx) => AlertDialog(
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
+                borderRadius: BorderRadius.circular(20),
+              ),
               title: const Text('Konfirmasi Penerimaan'),
-              content: const Text(
-                  'Apakah kamu sudah menerima paket ini?'),
+              content: const Text('Apakah kamu sudah menerima paket ini?'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
                   child: const Text('Belum'),
                 ),
                 ElevatedButton(
-                  onPressed: () {
-                    provider.confirmReceived(order.id);
+                  onPressed: () async {
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Paket dikonfirmasi diterima! 🎉'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
+                    // Tampilkan loading SnackBar
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Row(
+                            children: [
+                              SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                              SizedBox(width: 12),
+                              Text('Memproses konfirmasi...'),
+                            ],
+                          ),
+                          duration: Duration(seconds: 10),
+                          backgroundColor: Colors.blue,
+                        ),
+                      );
+                    }
+                    try {
+                      await provider.confirmReceived(order.id);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Paket dikonfirmasi diterima!'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Gagal konfirmasi: ${e.toString().replaceAll('Exception: ', '')}'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kprimaryColor,
@@ -665,8 +767,10 @@ class OrderDetailScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('Ya, Sudah Terima',
-                      style: TextStyle(color: Colors.white)),
+                  child: const Text(
+                    'Ya, Sudah Terima',
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
               ],
             ),
@@ -699,9 +803,7 @@ class OrderDetailScreen extends StatelessWidget {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => ReviewScreen(order: order),
-            ),
+            MaterialPageRoute(builder: (context) => ReviewScreen(order: order)),
           );
         },
         icon: const Icon(Icons.star_outline, color: Colors.white),

@@ -1,20 +1,26 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shoes_store/constant.dart';
 import 'package:shoes_store/models/orderModel.dart';
+import 'package:shoes_store/provider/cartProvider.dart';
+import 'package:shoes_store/provider/favoriteProvider.dart';
 import 'package:shoes_store/provider/orderProvider.dart';
+import 'package:shoes_store/provider/addressProvider.dart';
+import 'package:shoes_store/provider/reviewProvider.dart';
 import 'package:shoes_store/provider/userProvider.dart';
 import 'package:shoes_store/screens/profile/address/addressListScreen.dart';
 import 'package:shoes_store/screens/profile/editProfileScreen.dart';
 import 'package:shoes_store/screens/order/orderListScreen.dart';
 import 'package:shoes_store/screens/auth/loginScreen.dart';
-import 'package:shoes_store/screens/favorite/favorite.dart';
+import 'package:shoes_store/screens/favorite/favoriteScreen.dart';
 import 'package:shoes_store/screens/chatbot/chatBotScreen.dart';
-import 'package:shoes_store/services/auth_service.dart';
-import 'package:shoes_store/widgets/full_screen_viewer.dart';
+import 'package:shoes_store/services/authService.dart';
+import 'package:shoes_store/services/productService.dart';
+import 'package:shoes_store/widgets/fullScreenViewer.dart';
 
-class Profile extends StatelessWidget {
-  const Profile({super.key});
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -44,9 +50,15 @@ class Profile extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context, UserProvider user) {
-    final profileImage = user.profileImagePath != null
-        ? FileImage(File(user.profileImagePath!))
-        : const AssetImage("assets/pp.png") as ImageProvider;
+    final hasImage = user.profileImagePath != null && user.profileImagePath!.isNotEmpty;
+    ImageProvider? profileImage;
+    if (hasImage) {
+      if (user.profileImagePath!.startsWith('http')) {
+        profileImage = NetworkImage(user.profileImagePath!);
+      } else {
+        profileImage = FileImage(File(user.profileImagePath!));
+      }
+    }
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 60, 20, 30),
@@ -57,10 +69,16 @@ class Profile extends StatelessWidget {
       child: Row(
         children: [
           GestureDetector(
-            onTap: () => FullScreenViewer.show(context, profileImage),
+            onTap: () {
+              if (hasImage) {
+                FullScreenViewer.show(context, user.profileImagePath!);
+              }
+            },
             child: CircleAvatar(
               radius: 40,
+              backgroundColor: Colors.grey.shade300,
               backgroundImage: profileImage,
+              child: !hasImage ? const Icon(Icons.person, size: 45, color: Colors.white) : null,
             ),
           ),
           const SizedBox(width: 20),
@@ -182,7 +200,7 @@ class Profile extends StatelessWidget {
             Navigator.push(context, MaterialPageRoute(builder: (ctx) => const AddressListScreen()));
           }),
           _menuTile(context, Icons.favorite_outline, "Favorit Saya", "Daftar sepatu yang disukai", () {
-            Navigator.push(context, MaterialPageRoute(builder: (ctx) => const Favorite()));
+            Navigator.push(context, MaterialPageRoute(builder: (ctx) => const FavoriteScreen()));
           }),
           _menuTile(context, Icons.headset_mic_outlined, "Bantuan", "Pusat bantuan & Chatbot", () {
             Navigator.push(context, MaterialPageRoute(builder: (ctx) => const AssistantChatScreen()));
@@ -221,7 +239,25 @@ class Profile extends StatelessWidget {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Batal")),
           TextButton(
             onPressed: () async {
+              Navigator.pop(ctx); // tutup dialog dulu
+
+              // 1. Hapus token dari storage
               await AuthService.clearToken();
+
+              // 2. Wipe semua provider state agar data akun lama tidak bocor
+              if (context.mounted) {
+                context.read<CartProvider>().clearCart();
+                context.read<OrderProvider>().clearOrders();
+                context.read<FavoriteProvider>().clearFavorites();
+                context.read<AddressProvider>().clearAddresses();
+                context.read<ReviewProvider>().clearReviews();
+                context.read<UserProvider>().clearUser();
+              }
+
+              // 3. Invalidate product cache agar stok fresh saat login berikutnya
+              await ProductService.invalidateCache();
+
+              // 4. Navigasi ke Login, hapus semua route sebelumnya
               if (context.mounted) {
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (context) => const LoginScreen()),

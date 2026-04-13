@@ -1,4 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:shoes_store/constant.dart';
+
+class ProductSku {
+  final int id;
+  final String variantName;
+  final double price;
+  final int stockAvailable;
+
+  ProductSku({
+    required this.id,
+    required this.variantName,
+    required this.price,
+    required this.stockAvailable,
+  });
+
+  factory ProductSku.fromJson(Map<String, dynamic> json) {
+    return ProductSku(
+      id: json['id'] ?? 0,
+      variantName: json['variant_name'] ?? '',
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      stockAvailable: json['stock_available'] ?? 0,
+    );
+  }
+}
 
 class Product {
   final int id;
@@ -10,7 +34,8 @@ class Product {
   final String type;
   final double price;
   final List<Color> colors;
-  final List<String> sizes;
+  final List<String> sizes; // Deprecated: use skus instead for real logic
+  final List<ProductSku> skus;
   final String category;
   final double rate;
   int quantity;
@@ -25,28 +50,39 @@ class Product {
     required this.price,
     required this.colors,
     required this.sizes,
+    required this.skus,
     required this.type,
     required this.category,
     required this.rate,
     required this.quantity,
   });
 
+  static String _normalizeImageUrl(String url) {
+    if (url.isEmpty) return url;
+    if (url.startsWith('http')) return url;
+    if (url.startsWith('assets/')) return url; // Flutter local asset, jangan dinormalisasi
+    if (url.startsWith('/')) return '$kBaseUrl$url';
+    return '$kBaseUrl/$url';
+  }
 
   factory Product.fromJson(Map<String, dynamic> json) {
+    var skusList = (json['skus'] as List?)?.map((i) => ProductSku.fromJson(i)).toList() ?? [];
+
     return Product(
       id: json['id'] ?? 0,
       title: json['name'] ?? '',
       description: json['description'] ?? '',
-      specification: json['specification'] ?? "No specification",
-      image: "assets/promo1.jpg", 
-      review: "4.0 (0 reviews)", 
-      type: "Sneakers",          
+      specification: json['specification'] ?? "No specification provided.",
+      image: _normalizeImageUrl(json['image'] ?? ''),
+      review: "0 Reviews", 
+      type: json['category'] ?? "Sneakers",          
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
-      colors: [Colors.black],    
-      sizes: ["38", "39", "40", "41", "42"], 
-      category: "Shoes",        
-      rate: 4.0,                 
-      quantity: 99,
+      colors: [Colors.black, Colors.white, Colors.grey],    
+      sizes: skusList.map((s) => s.variantName).toList(), 
+      skus: skusList,
+      category: json['category'] ?? "Shoes",        
+      rate: (json['rating'] as num?)?.toDouble() ?? 0.0,                 
+      quantity: 1,
     );
   }
 
@@ -58,185 +94,5 @@ class Product {
       };
 }
 
-final List<Product> products = [
-  Product(
-    id: 1,
-    title: "Adidas Duramo",
-    description: "The Adidas Duramo is a stylish and comfortable running designed for everyday wear. It features a large Air unit in the heel for cushioning and a sleek, modern design.",
-    specification: "Material: Knit upper\nCushioning: Air\nOutsole: Rubber\nWeight: 350g\nDrop: 12mm",
-    image: "assets/adiduramorun.jpg",
-    review: "4.5 (200 reviews)",
-    type: "Running Shoes",
-    price: 150.0,
-    colors: [Colors.red, Colors.blue, Colors.green],
-    sizes: ["38", "39", "40", "41", "42"],
-    category: "Running Shoes",
-    rate: 4.5,
-    quantity: 1,
-  ),
-  Product(
-    id: 2,
-    title: "Adidas Run Blaze",
-    description: "The Adidas Run Blaze is a high-performance running shoe that combines comfort and style. It features Boost cushioning technology for energy return and a Primeknit upper for a snug fit.",
-    specification: "Material: Knit upper\nCushioning: Boost\nOutsole: Continental Rubber\nWeight: 310g\nDrop: 10mm",
-    image: "assets/adirunblazerun.webp",
-    review: "4.7 (150 reviews)",
-    type: "Running Shoes",
-    price: 180.0,
-    colors: [Colors.black, Colors.white, Colors.grey],
-    sizes: ["38", "39", "40", "41", "42"],
-    category: "Running Shoes",
-    rate: 4.7,
-    quantity: 1,
-  ),
-  Product(
-    id: 3,
-    title: "Arka Khaki",
-    description: "The Arka Khaki is a stylish and comfortable sneaker designed for everyday wear. It features a large Air unit in the heel for cushioning and a sleek, modern design.",
-    specification: "Material: Knit upper\nCushioning: Air\nOutsole: Rubber\nWeight: 350g\nDrop: 12mm",
-    image: "assets/arkakhakisneak.jpg",
-    review: "4.5 (200 reviews)",
-    type: "Sneakers",
-    price: 150.0,
-    colors: [Colors.red, Colors.blue, Colors.green],
-    sizes: ["38", "39", "40", "41", "42"],
-    category: "Sneakers",
-    rate: 4.5,
-    quantity: 1,
-  ),
-  Product(
-    id: 4,
-    title: "Gino Mariani Ederly",
-    description: "The Gino Mariani Ederly is a stylish and comfortable flat shoe designed for everyday wear. It features a large Air unit in the heel for cushioning and a sleek, modern design.",
-    specification: "Material: Knit upper\nCushioning: Air\nOutsole: Rubber\nWeight: 350g\nDrop: 12mm",
-    image: "assets/ginomarianiederlyflat.webp",
-    review: "4.5 (200 reviews)",
-    type: "flat shoes",
-    price: 180.0,
-    colors: [Colors.black, Colors.white, Colors.grey],
-    sizes: ["38", "39", "40", "41", "42"],
-    category: "flat shoes",
-    rate: 4.7,
-    quantity: 1,
-  ),
-  Product(
-    id: 5,
-    title: "Gino Mariani Holland",
-    description: "The Gino Mariani Holland is a stylish and comfortable formal shoe designed for everyday wear. It features a large Air unit in the heel for cushioning and a sleek, modern design.",
-    specification: "Material: Knit upper\nCushioning: Air\nOutsole: Rubber\nWeight: 350g\nDrop: 12mm",
-    image: "assets/ginomarianihollandform.webp",
-    review: "4.5 (200 reviews)",
-    type: "formal shoes",
-    price: 180.0,
-    colors: [Colors.black, Colors.white, Colors.grey],
-    sizes: ["38", "39", "40", "41", "42"],
-    category: "formal shoes",
-    rate: 4.5,
-    quantity: 1,
-  ),
-  Product(
-    id: 6,
-    title: "Hailey",
-    description: "The Hailey is a stylish and comfortable sneaker designed for everyday wear. It features a large Air unit in the heel for cushioning and a sleek, modern design.",
-    specification: "Material: Knit upper\nCushioning: Air\nOutsole: Rubber\nWeight: 350g\nDrop: 12mm",
-    image: "assets/haileysneak.jpg",
-    review: "4.7 (150 reviews)",
-    type: "sneakers",
-    price: 180.0,
-    colors: [Colors.black, Colors.white, Colors.grey],
-    sizes: ["38", "39", "40", "41", "42"],
-    category: "sneakers",
-    rate: 4.7,
-    quantity: 1,
-  ),
-  Product(
-    id: 7,
-    title: "Heaves",
-    description: "The Heaves is a stylish and comfortable flat shoe designed for everyday wear. It features a large Air unit in the heel for cushioning and a sleek, modern design.",
-    specification: "Material: Knit upper\nCushioning: Air\nOutsole: Rubber\nWeight: 350g\nDrop: 12mm",
-    image: "assets/heavesflat.webp",
-    review: "4.7 (150 reviews)",
-    type: "flat shoes",
-    price: 180.0,
-    colors: [Colors.black, Colors.white, Colors.grey],
-    sizes: ["38", "39", "40", "41", "42"],
-    category: "flat shoes",
-    rate: 4.7,
-    quantity: 1,
-  ),
-  Product(
-    id: 8,
-    title: "Marelli",
-    description: "The Marelli is a stylish and comfortable formal shoe designed for everyday wear. It features a large Air unit in the heel for cushioning and a sleek, modern design.",
-    specification: "Material: Knit upper\nCushioning: Air\nOutsole: Rubber\nWeight: 350g\nDrop: 12mm",
-    image: "assets/marelliform.webp",
-    review: "4.5 (200 reviews)",
-    type: "formal shoes",
-    price: 180.0,
-    colors: [Colors.black, Colors.white, Colors.grey],
-    sizes: ["38", "39", "40", "41", "42"],
-    category: "formal shoes",
-    rate: 4.5,
-    quantity: 1,
-  ),
-  Product(
-    id: 9,
-    title: "PM 172 Pedro",
-    description: "The PM 172 Pedro is a stylish and comfortable loafers shoe designed for everyday wear. It features a large Air unit in the heel for cushioning and a sleek, modern design.",
-    specification: "Material: Knit upper\nCushioning: Air\nOutsole: Rubber\nWeight: 350g\nDrop: 12mm",
-    image: "assets/pm172pedroloafer.webp",
-    review: "4.5 (200 reviews)",
-    type: "loafers shoes",
-    price: 180.0,
-    colors: [Colors.black, Colors.white, Colors.grey],
-    sizes: ["38", "39", "40", "41", "42"],
-    category: "loafers shoes",
-    rate: 4.7,
-    quantity: 1,
-  ),
-  Product(
-    id: 10,
-    title: "Skechers",
-    description: "The Skechers is a stylish and comfortable slip-on shoe designed for everyday wear. It features a large Air unit in the heel for cushioning and a sleek, modern design.",
-    specification: "Material: Knit upper\nCushioning: Air\nOutsole: Rubber\nWeight: 350g\nDrop: 12mm",
-    image: "assets/skechersslip.jpg",
-    review: "4.7 (150 reviews)",
-    type: "slip-on shoes",
-    price: 180.0,
-    colors: [Colors.black, Colors.white, Colors.grey],
-    sizes: ["38", "39", "40", "41", "42"],
-    category: "slip-on shoes",
-    rate: 4.7,
-    quantity: 1,
-  ),
-  Product(
-    id: 11,
-    title: "Vans Classic",
-    description: "The Vans Classic is a timeless and versatile slip-on that combines durability and style. It features a canvas upper and a durable rubber sole for all-day wear.",
-    specification: "Material: Canvas\nCushioning: Standard\nOutsole: Rubber\nWeight: 300g\nDrop: 8mm",
-    image: "assets/vansclassicslip.jpg",
-    review: "4.5 (180 reviews)",
-    type: "slip-on shoes",
-    price: 180.0,
-    colors: [Colors.black, Colors.white, Colors.grey],
-    sizes: ["38", "39", "40", "41", "42"],
-    category: "slip-on shoes",
-    rate: 4.7,
-    quantity: 1,
-  ),
-  Product(
-    id: 12,
-    title: "Wirken",
-    description: "The Wirken is a stylish and comfortable loafer shoe designed for everyday wear. It features a durable upper and a cushioned sole for all-day comfort.",
-    specification: "Material: Synthetic\nCushioning: Standard\nOutsole: Rubber\nWeight: 320g\nDrop: 9mm",
-    image: "assets/wirkenloafer.jpg",
-    review: "4.5 (160 reviews)",
-    type: "loafers shoes",
-    price: 180.0,
-    colors: [Colors.black, Colors.white, Colors.grey],
-    sizes: ["38", "39", "40", "41", "42"],
-    category: "loafers shoes",
-    rate: 4.7,
-    quantity: 1,
-  ),
-];
+// Global products list - will be populated from API, but keep as fallback
+List<Product> products = [];

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:shoes_store/constant.dart';
+import 'package:shoes_store/services/authService.dart';
 
 class AssistantChatScreen extends StatefulWidget {
   const AssistantChatScreen({super.key});
@@ -31,10 +31,10 @@ class _AssistantChatScreenState extends State<AssistantChatScreen> {
     try {
       // Alur Operasi Bungkam: Panggil backend simulasi cerdas
       final response = await http.post(
-        Uri.parse("$kBaseUrl/chat"), // Menggunakan Saklar Global
+        Uri.parse("${AuthService.baseUrl}/chat"), // Menggunakan Saklar Global
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"message": userMessage}),
-      );
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -49,7 +49,7 @@ class _AssistantChatScreenState extends State<AssistantChatScreen> {
       setState(() {
         messages.add({
           "role": "bot",
-          "text": "Maaf, asisten sedang offline. Coba lagi nanti ya!",
+          "text": "Maaf, asisten sedang sibuk atau koneksi lambat. Coba lagi nanti ya!",
         });
       });
     } finally {
@@ -95,7 +95,22 @@ class _AssistantChatScreenState extends State<AssistantChatScreen> {
               },
             ),
           ),
-          if (isLoading) const Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator(color: Colors.black)),
+          if (isLoading) 
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: const Text("Sedang mengetik...", style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
+                  ),
+                ],
+              ),
+            ),
           Container(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             color: Colors.white,
