@@ -62,6 +62,7 @@ class _AssistantChatScreenState extends State<AssistantChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -111,8 +112,10 @@ class _AssistantChatScreenState extends State<AssistantChatScreen> {
                 ],
               ),
             ),
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          SafeArea(
+            top: false,
+            child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             color: Colors.white,
             child: Row(
               children: [
@@ -134,7 +137,8 @@ class _AssistantChatScreenState extends State<AssistantChatScreen> {
                 ),
               ],
             ),
-          ),
+            ),  // Container
+          ),  // SafeArea
         ],
       ),
     );

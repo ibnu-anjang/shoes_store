@@ -6,7 +6,8 @@ import '../../widgets/smartImage.dart';
 import 'package:shoes_store/provider/orderProvider.dart';
 import 'package:shoes_store/constant.dart';
 import 'package:shoes_store/screens/navBar.dart';
-import 'package:shoes_store/screens/order/orderListScreen.dart';
+import 'package:shoes_store/screens/order/orderDetailScreen.dart';
+import 'package:shoes_store/models/orderModel.dart';
 import 'package:shoes_store/services/authService.dart';
 import 'package:shoes_store/screens/auth/loginScreen.dart';
 import 'package:shoes_store/screens/profile/address/addressListScreen.dart';
@@ -65,8 +66,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (!digits.startsWith('08') && !digits.startsWith('628')) {
       return 'Nomor WA harus diawali 08 atau 628';
     }
-    if (digits.length < 10 || digits.length > 15) {
-      return 'Nomor WA tidak valid (10–15 digit)';
+    if (digits.length < 10 || digits.length > 13) {
+      return 'Nomor WA tidak valid (10–13 digit)';
     }
     return null;
   }
@@ -74,7 +75,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _handleCheckout() async {
     if (_alamatController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mohon isi alamat pengiriman!'), backgroundColor: Colors.red),
+        const SnackBar(
+          content: Text('Mohon isi alamat pengiriman!'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
@@ -87,6 +91,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
 
     if (_isCheckingOut) return; // Guard double-tap
+
+    // Capture providers before async gap
+    final orderProvider = OrderProvider.of(context, listen: false);
+    final addressProvider = AddressProvider.of(context, listen: false);
 
     // Confirmation Dialog before placing order
     final confirmed = await showDialog<bool>(
@@ -107,7 +115,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  "Total Tagihan:",
+                  "Estimasi Total:",
                   style: TextStyle(color: Colors.grey),
                 ),
                 Text(
@@ -118,6 +126,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '* Total akhir akan bertambah kode unik (Rp 1–100) untuk identifikasi pembayaran.',
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontStyle: FontStyle.italic),
             ),
           ],
         ),
@@ -162,12 +175,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
-    final orderProvider = OrderProvider.of(context, listen: false);
-    final addressProvider = AddressProvider.of(context, listen: false);
-
+    if (!mounted) return;
     setState(() => _isCheckingOut = true);
     try {
-      await orderProvider.checkout(
+      final order = await orderProvider.checkout(
         items: widget.items,
         address: _alamatController.text,
         phone: _waController.text,
@@ -176,7 +187,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       addressProvider.clearSelectedAddress();
 
       if (!mounted) return;
-      _showSuccessDialog(_selectedMethod == 'COD');
+      _showSuccessDialog(_selectedMethod == 'COD', order);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -190,7 +201,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-  void _showSuccessDialog(bool isCOD) {
+  void _showSuccessDialog(bool isCOD, Order order) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -233,7 +244,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const OrderListScreen(),
+                      builder: (context) => OrderDetailScreen(order: order),
                     ),
                   );
                 },
@@ -244,7 +255,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                 ),
                 child: const Text(
-                  'Lihat Pesanan Saya',
+                  'Lihat Detail Pesanan',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -696,17 +707,28 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               children: [
                 Row(
                   children: [
-                    Text("Kode Unik", style: TextStyle(color: Colors.grey.shade600)),
+                    Text(
+                      "Kode Unik",
+                      style: TextStyle(color: Colors.grey.shade600),
+                    ),
                     const SizedBox(width: 5),
                     Tooltip(
-                      message: 'Ditambahkan ke total agar pembayaranmu mudah diidentifikasi sistem',
-                      child: Icon(Icons.info_outline, size: 14, color: Colors.grey.shade400),
+                      message:
+                          'Ditambahkan ke total agar pembayaranmu mudah diidentifikasi sistem',
+                      child: Icon(
+                        Icons.info_outline,
+                        size: 14,
+                        color: Colors.grey.shade400,
+                      ),
                     ),
                   ],
                 ),
                 Text(
                   "+ Rp 1–100",
-                  style: TextStyle(color: Colors.orange.shade700, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    color: Colors.orange.shade700,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
@@ -734,7 +756,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 '* Total akhir di detail pesanan akan berbeda karena penambahan kode unik (Rp 1–100) untuk identifikasi pembayaran.',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontStyle: FontStyle.italic),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade500,
+                  fontStyle: FontStyle.italic,
+                ),
               ),
             ),
         ],

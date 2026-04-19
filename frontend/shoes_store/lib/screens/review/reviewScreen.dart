@@ -3,20 +3,26 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:shoes_store/constant.dart';
-import 'package:shoes_store/models/orderModel.dart';
+import 'package:shoes_store/models/cartItem.dart';
 import 'package:shoes_store/provider/orderProvider.dart';
 import 'package:shoes_store/provider/reviewProvider.dart';
 import 'package:shoes_store/provider/userProvider.dart';
-import 'package:shoes_store/screens/navBar.dart';
+import 'package:shoes_store/services/apiService.dart';
 import '../../widgets/smartImage.dart';
 
 class ReviewScreen extends StatefulWidget {
-  final Order order;
+  /// Item spesifik yang akan direview.
+  final CartItem item;
+
+  /// ID order tempat item ini berasal (untuk ditampilkan di UI).
+  final String orderId;
+
   final ReviewItem? existingReview;
 
   const ReviewScreen({
     super.key,
-    required this.order,
+    required this.item,
+    required this.orderId,
     this.existingReview,
   });
 
@@ -28,7 +34,23 @@ class _ReviewScreenState extends State<ReviewScreen> {
   int _selectedRating = 0;
   final TextEditingController _reviewController = TextEditingController();
   bool _isSubmitted = false;
+  bool _isSubmitting = false;
   String? _tempImagePath;
+  String? _profileImagePath;
+  bool _isUploadingProfile = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.existingReview != null) {
+      _selectedRating = widget.existingReview!.rating.toInt();
+      _reviewController.text = widget.existingReview!.comment;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userProvider = UserProvider.of(context, listen: false);
+      setState(() => _profileImagePath = userProvider.profileImagePath);
+    });
+  }
 
   @override
   void dispose() {
@@ -36,17 +58,118 @@ class _ReviewScreenState extends State<ReviewScreen> {
     super.dispose();
   }
 
+  Future<void> _showProfileImagePicker() async {
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Text(
+                'Ubah Foto Profil',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _pickerOption(
+                    ctx,
+                    icon: Icons.camera_alt_outlined,
+                    label: 'Kamera',
+                    source: ImageSource.camera,
+                  ),
+                  _pickerOption(
+                    ctx,
+                    icon: Icons.photo_library_outlined,
+                    label: 'Galeri',
+                    source: ImageSource.gallery,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _pickerOption(BuildContext ctx, {required IconData icon, required String label, required ImageSource source}) {
+    return GestureDetector(
+      onTap: () async {
+        Navigator.pop(ctx);
+        await _pickProfileImage(source);
+      },
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: kcontentColor,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 28, color: kprimaryColor),
+          ),
+          const SizedBox(height: 8),
+          Text(label, style: const TextStyle(fontSize: 13, color: Colors.black87)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickProfileImage(ImageSource source) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: source, imageQuality: 80);
+    if (pickedFile == null) return;
+    setState(() {
+      _profileImagePath = pickedFile.path;
+      _isUploadingProfile = true;
+    });
+    try {
+      final result = await ApiService.uploadProfilePicture(pickedFile.path);
+      final user = result['user'];
+      if (user != null && mounted) {
+        final userProvider = UserProvider.of(context, listen: false);
+        final normalizedUrl = ApiService.normalizeImage(user['profile_image']?.toString() ?? '');
+        await userProvider.updateProfile(imagePath: pickedFile.path);
+        setState(() => _profileImagePath = normalizedUrl.isNotEmpty ? normalizedUrl : pickedFile.path);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal upload foto: $e'), backgroundColor: Colors.red),
+        );
+        setState(() => _profileImagePath = null);
+      }
+    } finally {
+      if (mounted) setState(() => _isUploadingProfile = false);
+    }
+  }
+
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-
     if (pickedFile != null) {
       if (Platform.isAndroid || Platform.isIOS) {
         _cropImage(pickedFile.path);
       } else {
-        setState(() {
-          _tempImagePath = pickedFile.path;
-        });
+        setState(() => _tempImagePath = pickedFile.path);
       }
     }
   }
@@ -77,15 +200,10 @@ class _ReviewScreenState extends State<ReviewScreen> {
         ),
       ],
     );
-
     if (croppedFile != null) {
-      setState(() {
-        _tempImagePath = croppedFile.path;
-      });
+      setState(() => _tempImagePath = croppedFile.path);
     }
   }
-
-  bool _isSubmitting = false;
 
   Future<void> _submitReview() async {
     if (_selectedRating == 0 || _isSubmitting) return;
@@ -97,13 +215,15 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
     final review = ReviewItem(
       id: widget.existingReview?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      productId: widget.order.items.first.product.id.toString(),
+      productId: widget.item.product.id.toString(),
+      orderItemId: widget.item.id ?? 0,
       userId: userProvider.userId,
       userName: userProvider.userName,
       rating: _selectedRating.toDouble(),
       comment: _reviewController.text,
       date: DateTime.now(),
       imagePath: _tempImagePath,
+      profilePicture: _profileImagePath,
     );
 
     try {
@@ -111,7 +231,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
         await reviewProvider.updateReview(review);
       } else {
         await reviewProvider.addReview(review);
-        orderProvider.markAsReviewed(widget.order.id);
+        await orderProvider.loadOrders();
       }
       if (mounted) setState(() => _isSubmitted = true);
     } catch (e) {
@@ -134,12 +254,10 @@ class _ReviewScreenState extends State<ReviewScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: Navigator.canPop(context)
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
-                onPressed: () => Navigator.pop(context),
-              )
-            : null,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: const Text(
           'Beri Review',
           style: TextStyle(
@@ -154,12 +272,60 @@ class _ReviewScreenState extends State<ReviewScreen> {
     );
   }
 
+  Widget _buildProfileAvatar() {
+    ImageProvider? imageProvider;
+    if (_profileImagePath != null && _profileImagePath!.isNotEmpty) {
+      if (_profileImagePath!.startsWith('http')) {
+        imageProvider = NetworkImage(_profileImagePath!);
+      } else {
+        imageProvider = FileImage(File(_profileImagePath!));
+      }
+    }
+
+    return Center(
+      child: Stack(
+        children: [
+          CircleAvatar(
+            radius: 42,
+            backgroundColor: Colors.grey.shade300,
+            backgroundImage: imageProvider,
+            child: _isUploadingProfile
+                ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                : imageProvider == null
+                    ? const Icon(Icons.person, size: 45, color: Colors.white)
+                    : null,
+          ),
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: GestureDetector(
+              onTap: _isUploadingProfile ? null : _showProfileImagePicker,
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: kprimaryColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildReviewForm() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(15),
       child: Column(
         children: [
-          // Product preview
+          // User profile avatar with camera button
+          _buildProfileAvatar(),
+          const SizedBox(height: 20),
+
+          // Product preview — hanya 1 item
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
@@ -168,7 +334,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 3),
                 ),
@@ -178,39 +344,43 @@ class _ReviewScreenState extends State<ReviewScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Pesanan ${widget.order.id}',
-                  style: TextStyle(
-                    color: Colors.grey.shade500,
-                    fontSize: 12,
-                  ),
+                  'Pesanan ${widget.orderId}',
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
                 ),
                 const SizedBox(height: 10),
-                ...widget.order.items.map((item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
+                Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: SmartImage(
+                        url: widget.item.product.image,
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: SmartImage(
-                              url: item.product.image,
-                              width: 50,
-                              height: 50,
-                              fit: BoxFit.cover,
+                          Text(
+                            widget.item.product.title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              item.product.title,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                              ),
-                            ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Size ${widget.item.selectedSize} • x${widget.item.quantity}',
+                            style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
                           ),
                         ],
                       ),
-                    )),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -226,7 +396,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 3),
                 ),
@@ -235,30 +405,20 @@ class _ReviewScreenState extends State<ReviewScreen> {
             child: Column(
               children: [
                 const Text(
-                  'Bagaimana pesananmu?',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
+                  'Bagaimana produk ini?',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                 ),
                 const SizedBox(height: 5),
                 Text(
                   _getRatingText(),
-                  style: TextStyle(
-                    color: Colors.grey.shade500,
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
                 ),
                 const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(5, (index) {
                     return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedRating = index + 1;
-                        });
-                      },
+                      onTap: () => setState(() => _selectedRating = index + 1),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.all(6),
@@ -290,7 +450,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 3),
                 ),
@@ -301,18 +461,14 @@ class _ReviewScreenState extends State<ReviewScreen> {
               children: [
                 const Text(
                   'Tulis Review',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: _reviewController,
                   maxLines: 4,
                   decoration: InputDecoration(
-                    hintText:
-                        'Ceritakan pengalamanmu dengan produk ini...',
+                    hintText: 'Ceritakan pengalamanmu dengan produk ini...',
                     hintStyle: TextStyle(color: Colors.grey.shade400),
                     filled: true,
                     fillColor: kcontentColor,
@@ -337,7 +493,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 3),
                 ),
@@ -350,10 +506,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                   children: [
                     Text(
                       'Tambahkan Foto',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     SizedBox(width: 5),
                     Text(
@@ -376,10 +529,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                       decoration: BoxDecoration(
                         color: kcontentColor,
                         borderRadius: BorderRadius.circular(15),
-                        border: Border.all(
-                          color: Colors.grey.shade300,
-                          style: BorderStyle.solid,
-                        ),
+                        border: Border.all(color: Colors.grey.shade300),
                       ),
                       child: const Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -449,8 +599,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                               color: Colors.red,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.close,
-                                color: Colors.white, size: 16),
+                            child: const Icon(Icons.close, color: Colors.white, size: 16),
                           ),
                         ),
                       ),
@@ -462,7 +611,6 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
           const SizedBox(height: 30),
 
-          // Submit Button
           SizedBox(
             width: double.infinity,
             height: 55,
@@ -476,10 +624,18 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 ),
               ),
               child: _isSubmitting
-                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
                   : const Text(
                       'Kirim Review',
-                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
             ),
           ),
@@ -497,16 +653,11 @@ class _ReviewScreenState extends State<ReviewScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Animated check icon
             TweenAnimationBuilder<double>(
               duration: const Duration(milliseconds: 600),
               tween: Tween(begin: 0.0, end: 1.0),
-              builder: (context, value, child) {
-                return Transform.scale(
-                  scale: value,
-                  child: child,
-                );
-              },
+              builder: (context, value, child) =>
+                  Transform.scale(scale: value, child: child),
               child: Container(
                 width: 100,
                 height: 100,
@@ -514,43 +665,26 @@ class _ReviewScreenState extends State<ReviewScreen> {
                   color: Colors.green.shade50,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  Icons.check_circle,
-                  color: Colors.green.shade400,
-                  size: 60,
-                ),
+                child: Icon(Icons.check_circle, color: Colors.green.shade400, size: 60),
               ),
             ),
             const SizedBox(height: 30),
             const Text(
-              'Terima Kasih! 🎉',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 24,
-              ),
+              'Terima Kasih!',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
             ),
             const SizedBox(height: 10),
             Text(
-              'Review kamu telah terkirim.\nRating: ${'⭐' * _selectedRating}',
+              'Review untuk ${widget.item.product.title} telah terkirim.\nRating: ${'⭐' * _selectedRating}',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 16,
-              ),
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
             ),
             const SizedBox(height: 40),
             SizedBox(
               width: double.infinity,
               height: 55,
               child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const BottomNavBar()),
-                    (route) => false,
-                  );
-                },
+                onPressed: () => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kprimaryColor,
                   shape: RoundedRectangleBorder(
@@ -558,7 +692,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                   ),
                 ),
                 child: const Text(
-                  'Kembali ke Beranda',
+                  'Selesai',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -575,18 +709,12 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
   String _getRatingText() {
     switch (_selectedRating) {
-      case 1:
-        return 'Sangat Buruk 😞';
-      case 2:
-        return 'Buruk 😕';
-      case 3:
-        return 'Cukup 😐';
-      case 4:
-        return 'Bagus 😊';
-      case 5:
-        return 'Sangat Bagus! 🤩';
-      default:
-        return 'Tap bintang untuk memberi rating';
+      case 1: return 'Sangat Buruk 😞';
+      case 2: return 'Buruk 😕';
+      case 3: return 'Cukup 😐';
+      case 4: return 'Bagus 😊';
+      case 5: return 'Sangat Bagus! 🤩';
+      default: return 'Tap bintang untuk memberi rating';
     }
   }
 }

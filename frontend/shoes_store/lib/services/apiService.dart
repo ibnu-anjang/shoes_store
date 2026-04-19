@@ -153,75 +153,84 @@ class ApiService {
       final response = await http.get(Uri.parse('$_baseUrl/orders'), headers: headers);
       if (response.statusCode == 200) {
         List data = jsonDecode(response.body);
-        return data.map((json) {
-          OrderStatus status;
-          switch (json['status']) {
-            case 'UNPAID': status = OrderStatus.menungguVerifikasi; break;
-            case 'VERIFYING': status = OrderStatus.menungguVerifikasi; break;
-            case 'PAID': status = OrderStatus.diproses; break;
-            case 'SHIPPED': status = OrderStatus.dalamPengiriman; break;
-            case 'DELIVERED': status = OrderStatus.diterima; break;
-            case 'COMPLETED': status = OrderStatus.diterima; break;
-            case 'CANCELLED': status = OrderStatus.dibatalkan; break;
-            default: status = OrderStatus.menungguVerifikasi;
-          }
-
-          // Parse items with product data from backend
-          List<CartItem> orderItems = [];
-          if (json['items'] != null) {
-            for (var itemJson in json['items']) {
-              final product = Product(
-                id: itemJson['product_id'] ?? 0,
-                title: itemJson['product_name'] ?? 'Produk',
-                description: '',
-                specification: '',
-                image: normalizeImage(itemJson['product_image'] ?? ''),
-                review: '',
-                type: '',
-                price: (itemJson['price_at_checkout'] as num).toDouble(),
-                colors: [],
-                sizes: [itemJson['variant_name'] ?? ''],
-                skus: [ProductSku(
-                  id: itemJson['sku_id'] ?? 0,
-                  variantName: itemJson['variant_name'] ?? '',
-                  price: (itemJson['price_at_checkout'] as num).toDouble(),
-                  stockAvailable: 0,
-                )],
-                category: '',
-                rate: 4.8,
-                quantity: 1,
-              );
-              orderItems.add(CartItem(
-                product: product,
-                sku: product.skus.first,
-                quantity: itemJson['quantity'] ?? 1,
-              ));
-            }
-          }
-
-          final int uniqueCode = (json['unique_code'] as num?)?.toInt() ?? 0;
-          final double total = (json['total'] as num).toDouble();
-          // Backend: total = sum_of_items + unique_code
-          final double subtotal = total - uniqueCode;
-
-          return Order(
-            id: json['id'].toString(),
-            total: total,
-            uniqueCode: uniqueCode,
-            status: status,
-            items: orderItems,
-            subtotal: subtotal,
-            ongkir: 0.0,
-            alamat: json['shipping_address'] ?? 'Tersimpan di sistem',
-            nomorWA: json['phone'] ?? '-',
-            tanggal: DateTime.tryParse(json['tanggal'].toString()) ?? DateTime.now(),
-          );
-        }).toList();
+        return data.map((json) => _parseOrderFromJson(json as Map<String, dynamic>)).toList();
       }
     } catch (e) {
       debugPrint('Error get orders: $e');
     }
     return [];
+  }
+
+  static Order _parseOrderFromJson(Map<String, dynamic> json) {
+    OrderStatus status;
+    switch (json['status']) {
+      case 'UNPAID': status = OrderStatus.menungguVerifikasi; break;
+      case 'VERIFYING': status = OrderStatus.menungguVerifikasi; break;
+      case 'PAID': status = OrderStatus.diproses; break;
+      case 'SHIPPED': status = OrderStatus.dalamPengiriman; break;
+      case 'DELIVERED': status = OrderStatus.diterima; break;
+      case 'COMPLETED': status = OrderStatus.diterima; break;
+      case 'CANCELLED': status = OrderStatus.dibatalkan; break;
+      default: status = OrderStatus.menungguVerifikasi;
+    }
+
+    final reviewedIds = (json['reviewed_item_ids'] as List?)
+        ?.map((e) => e as int)
+        .toSet() ?? {};
+    List<CartItem> orderItems = [];
+    if (json['items'] != null) {
+      for (var itemJson in json['items']) {
+        final orderItemId = itemJson['id'] as int?;
+        final product = Product(
+          id: itemJson['product_id'] ?? 0,
+          title: itemJson['product_name'] ?? 'Produk',
+          description: '',
+          specification: '',
+          image: normalizeImage(itemJson['product_image'] ?? ''),
+          review: '',
+          type: '',
+          price: (itemJson['price_at_checkout'] as num).toDouble(),
+          colors: [],
+          sizes: [itemJson['variant_name'] ?? ''],
+          skus: [ProductSku(
+            id: itemJson['sku_id'] ?? 0,
+            variantName: itemJson['variant_name'] ?? '',
+            price: (itemJson['price_at_checkout'] as num).toDouble(),
+            stockAvailable: 0,
+          )],
+          category: '',
+          rate: 4.8,
+          quantity: 1,
+        );
+        orderItems.add(CartItem(
+          id: orderItemId,
+          product: product,
+          sku: product.skus.first,
+          quantity: itemJson['quantity'] ?? 1,
+          isReviewed: orderItemId != null && reviewedIds.contains(orderItemId),
+        ));
+      }
+    }
+
+    final int uniqueCode = (json['unique_code'] as num?)?.toInt() ?? 0;
+    final double total = (json['total'] as num).toDouble();
+    final double subtotal = json['subtotal'] != null
+        ? (json['subtotal'] as num).toDouble()
+        : total - uniqueCode;
+
+    return Order(
+      id: json['id'].toString(),
+      total: total,
+      uniqueCode: uniqueCode,
+      status: status,
+      items: orderItems,
+      subtotal: subtotal,
+      ongkir: 0.0,
+      alamat: json['shipping_address'] ?? 'Tersimpan di sistem',
+      nomorWA: json['phone'] ?? '-',
+      tanggal: DateTime.tryParse(json['tanggal'].toString()) ?? DateTime.now(),
+      hasPaymentProof: json['payment'] != null,
+    );
   }
 
   static Future<Map<String, dynamic>> updateUserProfile({
@@ -257,7 +266,20 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> checkoutRemote(List<CartItem> items, String address, String phone) async {
+  static Future<Map<String, dynamic>> uploadProfilePicture(String imagePath) async {
+    final token = await AuthService.getToken();
+    var request = http.MultipartRequest('POST', Uri.parse('$_baseUrl/profile/update'));
+    if (token != null) request.headers['Authorization'] = 'Bearer $token';
+    if (await File(imagePath).exists()) {
+      request.files.add(await http.MultipartFile.fromPath('file', imagePath));
+    }
+    var streamResponse = await request.send();
+    var responseBody = await streamResponse.stream.bytesToString();
+    if (streamResponse.statusCode == 200) return jsonDecode(responseBody);
+    throw Exception(jsonDecode(responseBody)['detail'] ?? 'Gagal upload foto profil');
+  }
+
+  static Future<Order> checkoutRemote(List<CartItem> items, String address, String phone) async {
     try {
       final headers = await _authHeaders();
       final response = await http.post(
@@ -273,7 +295,7 @@ class ApiService {
         }),
       );
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        return _parseOrderFromJson(jsonDecode(response.body) as Map<String, dynamic>);
       } else {
         throw Exception(jsonDecode(response.body)['detail'] ?? "Gagal checkout");
       }
@@ -437,11 +459,15 @@ class ApiService {
     
     request.fields['id'] = payload['id'].toString();
     request.fields['product_id'] = payload['product_id'].toString();
+    request.fields['order_item_id'] = payload['order_item_id'].toString();
     request.fields['rating'] = payload['rating'].toString();
     if (payload['comment'] != null) {
       request.fields['comment'] = payload['comment'].toString();
     }
-    
+    if (payload['profile_picture'] != null) {
+      request.fields['profile_picture'] = payload['profile_picture'].toString();
+    }
+
     if (payload['image_path'] != null && !payload['image_path'].toString().startsWith('http')) {
       final String pathString = payload['image_path'].toString();
       if (await File(pathString).exists()) {

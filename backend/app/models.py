@@ -75,8 +75,9 @@ class Order(Base):
     __tablename__ = "orders"
     id = Column(String(50), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    total = Column(Float)
+    subtotal = Column(Float, nullable=True)       # harga produk murni (tanpa kode unik)
     unique_code = Column(Integer)
+    total = Column(Float)                          # total_payment = subtotal + unique_code
     status = Column(String(50)) # UNPAID, VERIFYING, PAID, SHIPPED, COMPLETED, CANCELLED
     tanggal = Column(DateTime, default=datetime.datetime.utcnow)
     expired_at = Column(DateTime)
@@ -121,6 +122,7 @@ class Review(Base):
     __tablename__ = "reviews"
     id = Column(String(50), primary_key=True)
     product_id = Column(Integer, ForeignKey("products.id"))
+    order_item_id = Column(Integer, ForeignKey("order_items.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     rating = Column(Float, nullable=False)
     comment = Column(String(500))

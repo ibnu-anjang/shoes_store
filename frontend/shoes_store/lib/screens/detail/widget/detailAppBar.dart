@@ -27,15 +27,6 @@ class DetailAppBar extends StatelessWidget {
           backgroundColor: Colors.white,
           padding: const EdgeInsets.all(15),
         ),
-        onPressed: (){},
-        icon:const Icon(Icons.share_outlined)
-    ),
-    const SizedBox(width: 10,),
-    IconButton(
-        style: IconButton.styleFrom(
-          backgroundColor: Colors.white,
-          padding: const EdgeInsets.all(15),
-        ),
         onPressed: (){
           provider.toggleFavorite(product);
         },

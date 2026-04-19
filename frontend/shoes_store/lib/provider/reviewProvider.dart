@@ -5,45 +5,53 @@ import 'package:shoes_store/services/apiService.dart';
 class ReviewItem {
   final String id;
   final String productId;
+  final int orderItemId;
   final String userId;
   final String userName;
   final double rating;
   final String comment;
   final DateTime date;
   final String? imagePath;
+  final String? profilePicture;
 
   ReviewItem({
     required this.id,
     required this.productId,
+    required this.orderItemId,
     required this.userId,
     required this.userName,
     required this.rating,
     required this.comment,
     required this.date,
     this.imagePath,
+    this.profilePicture,
   });
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'productId': productId,
+        'orderItemId': orderItemId,
         'userId': userId,
         'userName': userName,
         'rating': rating,
         'comment': comment,
         'date': date.toIso8601String(),
         'imagePath': imagePath,
+        'profilePicture': profilePicture,
       };
 
   factory ReviewItem.fromJson(Map<String, dynamic> json) {
     return ReviewItem(
       id: json['id'].toString(),
       productId: json['product_id']?.toString() ?? json['productId']?.toString() ?? '0',
+      orderItemId: (json['order_item_id'] as num?)?.toInt() ?? (json['orderItemId'] as num?)?.toInt() ?? 0,
       userId: json['user_id']?.toString() ?? json['userId']?.toString() ?? '0',
       userName: json['username'] ?? json['userName'] ?? (json['user_id'] != null ? "User #${json['user_id']}" : 'Pengguna'),
       rating: (json['rating'] as num?)?.toDouble() ?? 5.0,
       comment: json['comment'] ?? '',
       date: json['date'] != null ? DateTime.parse(json['date']) : DateTime.now(),
       imagePath: json['image_path'] ?? json['imagePath'],
+      profilePicture: json['profile_picture'] ?? json['profilePicture'] ?? json['user_profile_image'],
     );
   }
 }
@@ -90,9 +98,11 @@ class ReviewProvider extends ChangeNotifier {
       await ApiService.addReview({
         "id": review.id,
         "product_id": int.parse(review.productId),
+        "order_item_id": review.orderItemId,
         "rating": review.rating,
         "comment": review.comment,
         "image_path": review.imagePath,
+        "profile_picture": review.profilePicture,
       });
       // Refresh dari server untuk sinkronisasi data
       await loadProductReviews(review.productId);

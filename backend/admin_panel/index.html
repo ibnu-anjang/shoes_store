@@ -650,7 +650,7 @@ function fmtDate(d) {
 function renderDashboard() {
     // Revenue
     const revenueOrders = allOrders.filter(o => ['PAID','SHIPPED','COMPLETED','DELIVERED'].includes(o.status));
-    const revenue = revenueOrders.reduce((s, o) => s + o.total, 0);
+    const revenue = revenueOrders.reduce((s, o) => s + (o.subtotal ?? o.total), 0);
     document.getElementById('dash-revenue').textContent = fmtRp(revenue);
     document.getElementById('dash-total-orders').textContent = allOrders.length;
     const verifying = allOrders.filter(o => o.status === 'VERIFYING').length;

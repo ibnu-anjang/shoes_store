@@ -20,22 +20,26 @@ String formatRupiah(num amount) {
 
 // --- KONFIGURASI URL BACKEND ---
 // Ganti bagian ini sesuai domain Cloudflare kamu (tanpa https://)
-const String _kCloudflareHost = "www.ibnuanjang.my.id";
+const String _kCloudflareHost = "api.ibnuanjang.my.id";
 
 /// URL backend yang dipakai seluruh app. Dipilih secara otomatis berdasarkan platform:
 /// - Linux Desktop (debug) → http://localhost:8000
 /// - Android Emulator (debug) → http://10.0.2.2:8000
 /// - Android Device / Release Build → https://[cloudflare domain]
 String get kBaseUrl {
-  if (kIsWeb) return 'http://localhost:8000';
+  if (kIsWeb) {
+    // Debug web (flutter run -d chrome) → localhost
+    // Release web (build web) → Cloudflare Tunnel
+    if (kDebugMode) return 'http://localhost:8000';
+    return 'https://$_kCloudflareHost';
+  }
 
   if (kDebugMode) {
     if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
       return 'http://localhost:8000'; // Flutter desktop dev → langsung ke Docker lokal
     }
-    if (Platform.isAndroid) {
-      return 'http://10.0.2.2:8000'; // Android Emulator → loopback ke host
-    }
+    // Android emulator: ganti ke 'http://10.0.2.2:8000' jika pakai emulator
+    // Android device nyata (debug/release): tetap pakai Cloudflare
   }
 
   // Production / release / device nyata → pakai Cloudflare Tunnel

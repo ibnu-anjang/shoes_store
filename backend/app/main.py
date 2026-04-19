@@ -9,6 +9,7 @@ from app import models, database, schemas
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Header, Request
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import text
 from typing import List
 from passlib.context import CryptContext
 from fastapi.middleware.cors import CORSMiddleware
@@ -92,6 +93,15 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 models.Base.metadata.create_all(bind=database.engine)
 
+# Migration: tambah kolom subtotal jika belum ada (untuk data lama)
+with database.engine.connect() as _conn:
+    try:
+        _conn.execute(text("ALTER TABLE orders ADD COLUMN subtotal FLOAT NULL"))
+        _conn.commit()
+        logger.info("Migration: kolom subtotal berhasil ditambahkan ke tabel orders")
+    except Exception:
+        pass  # Kolom sudah ada, tidak perlu migrasi
+
 os.makedirs("uploads", exist_ok=True)
 
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
@@ -100,7 +110,7 @@ app.mount("/management", StaticFiles(directory="admin_panel", html=True), name="
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,  # Harus False jika allow_origins=["*"]; app pakai Bearer token, bukan cookie
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -108,10 +118,25 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 # Helper: enrich order items dengan data produk
 # ---------------------------------------------------------------------------
-def _enrich_order_items(orders):
-    """Konversi list ORM Order ke list dict dengan product info di tiap item."""
+def _enrich_order_items(orders, user_id: int = None, db: Session = None):
+    """Konversi list ORM Order ke list dict dengan product info di tiap item.
+
+    Jika user_id dan db diberikan, reviewed_item_ids diisi berdasarkan review
+    yang sudah dikirim user tersebut untuk tiap order_item.
+    """
     result = []
     for order in orders:
+        reviewed_item_ids: list = []
+        if user_id and db:
+            reviewed_item_ids = [
+                r.order_item_id
+                for r in db.query(models.Review).filter(
+                    models.Review.user_id == user_id,
+                    models.Review.order_item_id.in_([i.id for i in order.items]),
+                ).all()
+                if r.order_item_id is not None
+            ]
+
         order_dict = {
             "id": order.id,
             "user_id": order.user_id,
@@ -124,6 +149,7 @@ def _enrich_order_items(orders):
             "phone": order.phone,
             "payment": None,
             "items": [],
+            "reviewed_item_ids": reviewed_item_ids,
         }
 
         if order.payment:
@@ -241,7 +267,9 @@ def login_with_json(request: Request, user_data: schemas.UserLogin, db: Session 
     if not user:
         user = db.query(models.User).filter(models.User.email == user_data.username).first()
     if not user or not pwd_context.verify(user_data.password, user.hashed_password):
+        logger.warning(f"Login gagal: {user_data.username} dari IP {request.client.host}")
         raise HTTPException(status_code=400, detail="Username atau password salah!")
+    logger.info(f"User login: {user.username} dari IP {request.client.host}")
     return {
         "access_token": f"token-rahasia-{user.username}",
         "token_type": "bearer",
@@ -496,6 +524,7 @@ def checkout_cart(payload: schemas.OrderCreate, username: str = Depends(get_curr
                     models.CartItem.sku_id == item.sku_id
                 ).delete()
 
+        new_order.subtotal = calculated_total
         new_order.total = calculated_total + unique_code
 
         log = models.TransactionLog(
@@ -528,7 +557,7 @@ def get_order_history(username: str = Depends(get_current_user), db: Session = D
     if not user:
         raise HTTPException(status_code=404, detail="User tidak ditemukan")
     orders = db.query(models.Order).filter(models.Order.user_id == user.id).all()
-    return _enrich_order_items(orders)
+    return _enrich_order_items(orders, user_id=user.id, db=db)
 
 
 # ---------------------------------------------------------------------------
@@ -920,8 +949,19 @@ def delete_address(address_id: str, username: str = Depends(get_current_user), d
 # Reviews
 # ---------------------------------------------------------------------------
 def _enrich_review(review, db: Session) -> dict:
-    """Tambahkan username ke dict review."""
+    """Tambahkan username dan profile_picture ke dict review."""
     user = db.query(models.User).filter(models.User.id == review.user_id).first()
+    profile_pic = None
+    if user and user.profile_image:
+        img = user.profile_image
+        if img.startswith('http'):
+            profile_pic = img
+        elif img.startswith('/'):
+            profile_pic = img
+        elif img.startswith('uploads/'):
+            profile_pic = f"/{img}"
+        else:
+            profile_pic = f"/uploads/{img}"
     return {
         "id": review.id,
         "product_id": review.product_id,
@@ -930,6 +970,7 @@ def _enrich_review(review, db: Session) -> dict:
         "rating": review.rating,
         "comment": review.comment,
         "image_path": review.image_path,
+        "profile_picture": profile_pic,
         "date": review.date,
     }
 
@@ -947,6 +988,7 @@ async def add_review(
     username: str = Depends(get_current_user),
     id: str = Form(...),
     product_id: int = Form(...),
+    order_item_id: int = Form(...),
     rating: float = Form(...),
     comment: str = Form(None),
     file: UploadFile = File(None),
@@ -956,13 +998,13 @@ async def add_review(
     if not user:
         raise HTTPException(status_code=404, detail="User tidak ditemukan")
 
-    # Satu user hanya bisa review 1x per produk
+    # Satu user hanya bisa review 1x per order_item (bukan per produk)
     existing = db.query(models.Review).filter(
-        models.Review.product_id == product_id,
+        models.Review.order_item_id == order_item_id,
         models.Review.user_id == user.id
     ).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Kamu sudah memberikan ulasan untuk produk ini. Gunakan fitur edit untuk mengubah ulasanmu.")
+        raise HTTPException(status_code=400, detail="Kamu sudah memberikan ulasan untuk pembelian ini.")
 
     image_path_saved = None
     if file and file.filename:
@@ -980,6 +1022,7 @@ async def add_review(
         new_rev = models.Review(
             id=id,
             product_id=product_id,
+            order_item_id=order_item_id,
             user_id=user.id,
             rating=rating,
             comment=comment,
@@ -989,7 +1032,7 @@ async def add_review(
         db.add(models.TransactionLog(
             user_id=user.id,
             action="ADD_REVIEW",
-            details=f"Review untuk produk {product_id}"
+            details=f"Review untuk produk {product_id} (order_item {order_item_id})"
         ))
         db.commit()
         db.refresh(new_rev)

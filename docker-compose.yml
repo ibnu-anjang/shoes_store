@@ -4,7 +4,7 @@ services:
   db:
     image: mariadb:10.11
     container_name: shoes_store_db
-    restart: always
+    restart: "no"
     environment:
       # Mengizinkan login root tanpa password (sesuai settingan di database.py)
       MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: 'yes'
@@ -27,13 +27,13 @@ services:
   app:
     build: ./backend
     container_name: my_uvicorn_app
+    restart: "no"
     expose:
       - "8000"
     ports:
       - "8000:8000"
     env_file:
       - ./backend/.env
-    restart: always
     depends_on:
       db:
         # Backend hanya start SETELAH MariaDB healthy (bukan sekedar container jalan)
@@ -47,7 +47,7 @@ services:
   tunnel:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared_connector
-    restart: always
+    restart: "no"
     # GANTI KODE DI BAWAH DENGAN TOKEN ASLI DARI DASHBOARD
     command: tunnel --no-autoupdate run --token eyJhIjoiZDdjNDk2ZjlmOTEyODk5N2ZjOWYzNDI5Mzg2MWM0MzUiLCJ0IjoiYWUyMDQ1YmEtYjRmZS00YjQwLWEyYjktYzhlZDI4OGM4Y2Y5IiwicyI6Ik1XUTVOemxrT1RndE1ETTBNeTAwTmpGa0xUaGxZVGt0TldKbFpURTFObVE1TW1JMCJ9
     depends_on:
@@ -56,7 +56,7 @@ services:
   phpmyadmin:
     image: phpmyadmin:latest
     container_name: shoes_store_pma
-    restart: always
+    restart: "no"
     ports:
       - '8080:80'
     environment:

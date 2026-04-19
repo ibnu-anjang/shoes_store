@@ -1,22 +1,69 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shoes_store/constant.dart';
 import 'package:shoes_store/models/orderModel.dart';
 import 'package:shoes_store/provider/orderProvider.dart';
 import 'package:shoes_store/screens/detail/detailScreen.dart';
 import '../../widgets/smartImage.dart';
-import 'package:shoes_store/screens/review/reviewScreen.dart';
+import 'package:shoes_store/screens/review/reviewHelper.dart';
+import 'package:shoes_store/services/apiService.dart';
 
-class OrderDetailScreen extends StatelessWidget {
+class OrderDetailScreen extends StatefulWidget {
   final Order order;
   const OrderDetailScreen({super.key, required this.order});
+
+  @override
+  State<OrderDetailScreen> createState() => _OrderDetailScreenState();
+}
+
+class _OrderDetailScreenState extends State<OrderDetailScreen> {
+  File? _proofImage;
+  bool _isUploading = false;
+
+  Future<void> _pickImage() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 80);
+    if (picked != null) {
+      setState(() => _proofImage = File(picked.path));
+    }
+  }
+
+  Future<void> _uploadProof(String orderId) async {
+    if (_proofImage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pilih foto bukti pembayaran terlebih dahulu!'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    final provider = OrderProvider.of(context, listen: false);
+    setState(() => _isUploading = true);
+    try {
+      await ApiService.uploadPayment(orderId, _proofImage!);
+      await provider.loadOrders();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bukti pembayaran berhasil dikirim! Menunggu verifikasi admin.'), backgroundColor: Colors.green),
+        );
+        setState(() => _proofImage = null);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal upload: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final provider = OrderProvider.of(context);
     // Re-fetch order from provider to get latest status
     final currentOrder = provider.orders.firstWhere(
-      (o) => o.id == order.id,
-      orElse: () => order,
+      (o) => o.id == widget.order.id,
+      orElse: () => widget.order,
     );
 
     return Scaffold(
@@ -48,10 +95,14 @@ class OrderDetailScreen extends StatelessWidget {
             _buildStatusTimeline(currentOrder),
             const SizedBox(height: 15),
 
-            // INTRUKSI PEMBAYARAN (Baru)
+            // INTRUKSI PEMBAYARAN
             if (currentOrder.status == OrderStatus.menungguVerifikasi &&
                 currentOrder.paymentMethod != 'COD') ...[
               _buildPaymentInstructions(currentOrder),
+              const SizedBox(height: 15),
+              // Hanya tampilkan upload jika belum ada bukti
+              if (!currentOrder.hasPaymentProof)
+                _buildProofUploadSection(currentOrder.id),
               const SizedBox(height: 15),
             ],
 
@@ -70,9 +121,23 @@ class OrderDetailScreen extends StatelessWidget {
             _buildPriceCard(currentOrder),
             const SizedBox(height: 15),
 
-            // Konfirmasi Verifikasi (SIMULASI ADMIN)
+            // Info menunggu validasi
             if (currentOrder.status == OrderStatus.menungguVerifikasi)
-              _buildSimulateVerifyButton(context, currentOrder, provider),
+              _buildWaitingInfoCard(
+                icon: Icons.hourglass_top,
+                color: Colors.orange,
+                message: 'Menunggu Validasi Pembayaran',
+                sub: 'Admin sedang memverifikasi bukti transfer Anda.',
+              ),
+
+            // Info menunggu pengiriman
+            if (currentOrder.status == OrderStatus.diproses)
+              _buildWaitingInfoCard(
+                icon: Icons.inventory_2_outlined,
+                color: Colors.blue,
+                message: 'Menunggu Toko Mengirim Barang',
+                sub: 'Pesanan Anda sedang diproses dan segera dikirim.',
+              ),
 
             // Konfirmasi Terima (jika status = dalam pengiriman)
             if (currentOrder.status == OrderStatus.dalamPengiriman)
@@ -265,10 +330,14 @@ class OrderDetailScreen extends StatelessWidget {
             _instructionRow('Bank', 'BCA (Modern Shoes Store)'),
             _instructionRow('No. Rekening', '7712 8890 1234'),
             _instructionRow('Atas Nama', 'PT Shoes Store Modern'),
-            _instructionRow(
-              'Total Bayar',
-              formatRupiah(order.total),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Divider(height: 1, color: Colors.blue),
             ),
+            _instructionRow('Harga Produk', formatRupiah(order.subtotal)),
+            _instructionRow('Kode Unik', '+ ${order.uniqueCode}'),
+            const SizedBox(height: 4),
+            _instructionRowBold('Total Transfer', formatRupiah(order.total)),
           ],
           const SizedBox(height: 15),
           const Text(
@@ -291,16 +360,107 @@ class OrderDetailScreen extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: TextStyle(color: Colors.blue.shade700, fontSize: 13),
-          ),
+          Text(label, style: TextStyle(color: Colors.blue.shade700, fontSize: 13)),
           Text(
             value,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-              color: Colors.blue.shade900,
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.blue.shade900),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _instructionRowBold(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: Colors.blue.shade800, fontSize: 14, fontWeight: FontWeight.bold)),
+          Text(
+            value,
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Colors.blue.shade900),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProofUploadSection(String orderId) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.orange.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.upload_file, color: Colors.orange.shade700),
+              const SizedBox(width: 8),
+              Text(
+                'Upload Bukti Pembayaran',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.orange.shade800),
+              ),
+              const SizedBox(width: 4),
+              Text('*wajib', style: TextStyle(fontSize: 11, color: Colors.red.shade600, fontStyle: FontStyle.italic)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: _pickImage,
+            child: Container(
+              width: double.infinity,
+              height: _proofImage != null ? null : 100,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange.shade300, style: BorderStyle.solid, width: 2),
+              ),
+              child: _proofImage != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.file(_proofImage!, fit: BoxFit.cover),
+                    )
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add_photo_alternate_outlined, size: 36, color: Colors.orange.shade300),
+                        const SizedBox(height: 6),
+                        Text('Tap untuk pilih foto', style: TextStyle(color: Colors.orange.shade400, fontSize: 12)),
+                      ],
+                    ),
+            ),
+          ),
+          if (_proofImage != null) ...[
+            const SizedBox(height: 6),
+            TextButton.icon(
+              onPressed: _pickImage,
+              icon: const Icon(Icons.swap_horiz, size: 16),
+              label: const Text('Ganti Foto', style: TextStyle(fontSize: 12)),
+            ),
+          ],
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: _isUploading ? null : () => _uploadProof(orderId),
+              icon: _isUploading
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.send, color: Colors.white),
+              label: Text(
+                _isUploading ? 'Mengirim...' : 'Kirim Bukti Pembayaran',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _proofImage != null ? Colors.orange.shade700 : Colors.grey,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
             ),
           ),
         ],
@@ -505,50 +665,46 @@ class OrderDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSimulateVerifyButton(
-    BuildContext context,
-    Order order,
-    OrderProvider provider,
-  ) {
+  Widget _buildWaitingInfoCard({
+    required IconData icon,
+    required MaterialColor color,
+    required String message,
+    required String sub,
+  }) {
     return Container(
       width: double.infinity,
-      height: 55,
       margin: const EdgeInsets.only(bottom: 15),
-      child: ElevatedButton.icon(
-        onPressed: () async {
-          try {
-            await provider.updateStatus(order.id, OrderStatus.diproses);
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Pembayaran Diverifikasi! (Simulasi Admin)'),
-                  backgroundColor: Colors.blue,
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      decoration: BoxDecoration(
+        color: color.shade50,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: color.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color.shade700, size: 28),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: color.shade800,
+                  ),
                 ),
-              );
-            }
-          } catch (e) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Gagal: ${e.toString().replaceAll("Exception: ", "")}'), backgroundColor: Colors.red),
-              );
-            }
-          }
-        },
-        icon: const Icon(Icons.verified_user, color: Colors.white),
-        label: const Text(
-          'Simulasi: Verifikasi Pembayaran',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+                const SizedBox(height: 3),
+                Text(
+                  sub,
+                  style: TextStyle(fontSize: 12, color: color.shade700),
+                ),
+              ],
+            ),
           ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: kprimaryColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-        ),
+        ],
       ),
     );
   }
@@ -632,31 +788,6 @@ class OrderDetailScreen extends StatelessWidget {
             'Ongkos Kirim',
             order.ongkir == 0 ? 'Gratis' : formatRupiah(order.ongkir),
           ),
-          if (order.uniqueCode > 0) ...[
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      'Kode Unik',
-                      style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-                    ),
-                    const SizedBox(width: 6),
-                    Tooltip(
-                      message: 'Angka unik untuk identifikasi pembayaranmu',
-                      child: Icon(Icons.info_outline, size: 14, color: Colors.grey.shade400),
-                    ),
-                  ],
-                ),
-                Text(
-                  '+${order.uniqueCode}',
-                  style: TextStyle(fontSize: 14, color: Colors.orange.shade700),
-                ),
-              ],
-            ),
-          ],
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 10),
             child: Divider(height: 1),
@@ -800,12 +931,7 @@ class OrderDetailScreen extends StatelessWidget {
       width: double.infinity,
       height: 55,
       child: ElevatedButton.icon(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => ReviewScreen(order: order)),
-          );
-        },
+        onPressed: () => openReviewPicker(context, order),
         icon: const Icon(Icons.star_outline, color: Colors.white),
         label: const Text(
           'Beri Rating & Review',

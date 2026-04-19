@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shoes_store/constant.dart';
 import 'package:shoes_store/provider/reviewProvider.dart';
@@ -28,6 +27,35 @@ class Description extends StatefulWidget {
 
 class _DescriptionState extends State<Description> {
   int selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Fetch reviews saat detail produk dibuka agar langsung tampil tanpa perlu beli dulu
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ReviewProvider.of(context, listen: false).loadProductReviews(widget.productId);
+    });
+  }
+
+  Widget _buildReviewAvatar(String? profilePicture) {
+    ImageProvider? imageProvider;
+    if (profilePicture != null && profilePicture.isNotEmpty) {
+      final url = profilePicture.startsWith('http')
+          ? profilePicture
+          : ApiService.normalizeImage(profilePicture);
+      if (url != null && url.isNotEmpty) {
+        imageProvider = NetworkImage(url);
+      }
+    }
+    return CircleAvatar(
+      radius: 18,
+      backgroundColor: Colors.grey.shade300,
+      backgroundImage: imageProvider,
+      child: imageProvider == null
+          ? const Icon(Icons.person, size: 18, color: Colors.white)
+          : null,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -100,6 +128,8 @@ class _DescriptionState extends State<Description> {
                         children: [
                           Row(
                             children: [
+                              _buildReviewAvatar(review.profilePicture),
+                              const SizedBox(width: 10),
                               Text(review.userName, style: const TextStyle(fontWeight: FontWeight.bold)),
                               if (isOwnReview)
                                 Container(
@@ -124,20 +154,28 @@ class _DescriptionState extends State<Description> {
                                 // EDIT BUTTON
                                 GestureDetector(
                                   onTap: () {
-                                    // Cari order yang sesuai produk ini
+                                    // Cari order_item yang sesuai dengan orderItemId review ini
                                     try {
-                                      final order = orderProvider.orders.firstWhere(
-                                        (o) => o.items.any((item) => item.product.id.toString() == widget.productId)
-                                      );
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => ReviewScreen(
-                                            order: order,
-                                            existingReview: review,
+                                      for (final order in orderProvider.orders) {
+                                        final matchItem = order.items.firstWhere(
+                                          (item) => item.id == review.orderItemId,
+                                          orElse: () => order.items.firstWhere(
+                                            (item) => item.product.id.toString() == widget.productId,
                                           ),
-                                        ),
-                                      );
+                                        );
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => ReviewScreen(
+                                              item: matchItem,
+                                              orderId: order.id,
+                                              existingReview: review,
+                                            ),
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      throw Exception('tidak ditemukan');
                                     } catch (e) {
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         const SnackBar(content: Text("Data pesanan tidak ditemukan")),

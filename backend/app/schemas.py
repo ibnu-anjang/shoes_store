@@ -187,6 +187,7 @@ class OrderCreate(BaseModel):
 class OrderResponse(OrderBase):
     id: str  # id berupa string (unik kode order dari frontend/backend)
     user_id: int
+    subtotal: Optional[float] = None
     unique_code: int
     tanggal: datetime.datetime
     expired_at: datetime.datetime
@@ -194,6 +195,7 @@ class OrderResponse(OrderBase):
     phone: Optional[str] = None
     items: List[OrderItemResponse] = []
     payment: Optional[PaymentConfirmationResponse] = None
+    reviewed_item_ids: List[int] = []
     class Config:
         from_attributes = True
 

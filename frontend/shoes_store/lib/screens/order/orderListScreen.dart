@@ -6,7 +6,7 @@ import 'package:shoes_store/provider/orderProvider.dart';
 import 'package:shoes_store/screens/detail/detailScreen.dart';
 import 'package:shoes_store/screens/order/orderDetailScreen.dart';
 import 'package:shoes_store/screens/cart/checkoutScreen.dart';
-import 'package:shoes_store/screens/review/reviewScreen.dart';
+import 'package:shoes_store/screens/review/reviewHelper.dart';
 
 class OrderListScreen extends StatefulWidget {
   final int initialIndex;
@@ -17,8 +17,6 @@ class OrderListScreen extends StatefulWidget {
 }
 
 class _OrderListScreenState extends State<OrderListScreen> {
-  final Set<String> _loadingOrderIds = {};
-
   @override
   Widget build(BuildContext context) {
     final provider = OrderProvider.of(context);
@@ -49,10 +47,12 @@ class _OrderListScreenState extends State<OrderListScreen> {
           centerTitle: true,
           bottom: TabBar(
             isScrollable: true,
+            tabAlignment: TabAlignment.start,
             labelColor: kprimaryColor,
             unselectedLabelColor: Colors.grey,
             indicatorColor: kprimaryColor,
             indicatorWeight: 3,
+            labelPadding: const EdgeInsets.symmetric(horizontal: 16),
             labelStyle: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 13,
@@ -68,15 +68,15 @@ class _OrderListScreenState extends State<OrderListScreen> {
         ),
         body: TabBarView(
           children: [
-            _buildRefreshable(context, provider, _buildOrderList(context, orders, provider)),
+            _buildRefreshable(context, provider, _buildOrderList(context, orders)),
             _buildRefreshable(context, provider,
-              _buildOrderList(context, orders.where((o) => o.status == OrderStatus.menungguVerifikasi).toList(), provider)),
+              _buildOrderList(context, orders.where((o) => o.status == OrderStatus.menungguVerifikasi).toList())),
             _buildRefreshable(context, provider,
-              _buildOrderList(context, orders.where((o) => o.status == OrderStatus.diproses).toList(), provider)),
+              _buildOrderList(context, orders.where((o) => o.status == OrderStatus.diproses).toList())),
             _buildRefreshable(context, provider,
-              _buildOrderList(context, orders.where((o) => o.status == OrderStatus.dalamPengiriman).toList(), provider)),
+              _buildOrderList(context, orders.where((o) => o.status == OrderStatus.dalamPengiriman).toList())),
             _buildRefreshable(context, provider,
-              _buildOrderList(context, orders.where((o) => o.status == OrderStatus.diterima).toList(), provider)),
+              _buildOrderList(context, orders.where((o) => o.status == OrderStatus.diterima).toList())),
           ],
         ),
       ),
@@ -94,7 +94,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
   Widget _buildOrderList(
     BuildContext context,
     List<Order> filteredOrders,
-    OrderProvider provider,
   ) {
     if (filteredOrders.isEmpty) {
       return SingleChildScrollView(
@@ -128,7 +127,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
       itemCount: filteredOrders.length,
       itemBuilder: (context, index) {
         final order = filteredOrders[index];
-        return _buildOrderCard(context, order, provider);
+        return _buildOrderCard(context, order);
       },
     );
   }
@@ -136,7 +135,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
   Widget _buildOrderCard(
     BuildContext context,
     Order order,
-    OrderProvider provider,
   ) {
     return GestureDetector(
       onTap: () {
@@ -295,18 +293,11 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   padding: const EdgeInsets.only(top: 15),
                   child: Row(
                     children: [
-                      // BUTTON BERI REVIEW (hanya jika belum direview)
+                      // BUTTON BERI REVIEW (hanya jika ada item belum direview)
                       if (!order.isReviewed)
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ReviewScreen(order: order),
-                                ),
-                              );
-                            },
+                            onPressed: () => openReviewPicker(context, order),
                             icon: const Icon(Icons.star_border, size: 16, color: Colors.white),
                             label: const Text(
                               'Beri Review',
@@ -381,57 +372,51 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   ),
                 ),
 
-              // TOMBOL SIMULASI (ADMIN)
-              if (order.status == OrderStatus.menungguVerifikasi ||
-                  order.status == OrderStatus.diproses)
+              if (order.status == OrderStatus.menungguVerifikasi)
                 Padding(
                   padding: const EdgeInsets.only(top: 15),
-                  child: SizedBox(
+                  child: Container(
                     width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _loadingOrderIds.contains(order.id) ? null : () async {
-                        setState(() => _loadingOrderIds.add(order.id));
-                        try {
-                          if (order.status == OrderStatus.menungguVerifikasi) {
-                            await provider.updateStatus(order.id, OrderStatus.diproses);
-                          } else {
-                            await provider.updateStatus(order.id, OrderStatus.dalamPengiriman);
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Gagal: ${e.toString().replaceAll("Exception: ", "")}'), backgroundColor: Colors.red),
-                            );
-                          }
-                        } finally {
-                          if (mounted) setState(() => _loadingOrderIds.remove(order.id));
-                        }
-                      },
-                      icon: _loadingOrderIds.contains(order.id)
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: kprimaryColor),
-                            )
-                          : Icon(
-                              order.status == OrderStatus.menungguVerifikasi
-                                  ? Icons.verified_user
-                                  : Icons.local_shipping,
-                              size: 16,
-                            ),
-                      label: Text(
-                        order.status == OrderStatus.menungguVerifikasi
-                            ? 'Simulasi: Verifikasi Pembayaran'
-                            : 'Simulasi: Kirim Paket',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: kprimaryColor,
-                        side: const BorderSide(color: kprimaryColor),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.orange.shade200),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.hourglass_top, color: Colors.orange.shade700, size: 14),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Menunggu Validasi Pembayaran',
+                          style: TextStyle(fontSize: 12, color: Colors.orange.shade800, fontWeight: FontWeight.w600),
                         ),
-                      ),
+                      ],
+                    ),
+                  ),
+                ),
+              if (order.status == OrderStatus.diproses)
+                Padding(
+                  padding: const EdgeInsets.only(top: 15),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.inventory_2_outlined, color: Colors.blue.shade700, size: 14),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Menunggu Toko Mengirim Barang',
+                          style: TextStyle(fontSize: 12, color: Colors.blue.shade800, fontWeight: FontWeight.w600),
+                        ),
+                      ],
                     ),
                   ),
                 ),

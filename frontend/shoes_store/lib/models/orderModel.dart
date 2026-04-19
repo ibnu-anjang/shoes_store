@@ -21,7 +21,7 @@ class Order {
   OrderStatus status;
   String? resi;
   final String? paymentMethod;
-  bool isReviewed;
+  final bool hasPaymentProof;
 
   Order({
     required this.id,
@@ -36,8 +36,11 @@ class Order {
     this.status = OrderStatus.diproses,
     this.resi,
     this.paymentMethod,
-    this.isReviewed = false,
+    this.hasPaymentProof = false,
   });
+
+  /// Order dianggap sudah direview jika semua item sudah direview.
+  bool get isReviewed => items.isNotEmpty && items.every((i) => i.isReviewed);
 
   String get statusText {
     switch (status) {

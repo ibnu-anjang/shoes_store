@@ -71,4 +71,4 @@ Gunakan struktur log yang jelas (bahasa Indonesia).
 - Jangan pernah hardcode URL production di kode Flutter.
 - Selalu gunakan Context7 untuk cek API/library terbaru.
 - Buat Activity Log tanpa terkecuali.
-- Jika ragu, tanyakan dulu sebelum coding.
+- Jika ragu, tanyakan dulu sebelum coding, janagn buat perubahan sampai kamu mencapai kepercayaan diri 95%.

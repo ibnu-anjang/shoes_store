@@ -34,8 +34,8 @@ class OrderProvider extends ChangeNotifier {
     }
   }
 
-  /// Checkout untuk user saat ini.
-  Future<String> checkout({
+  /// Checkout untuk user saat ini. Returns the created Order with fixed unique_code and total.
+  Future<Order> checkout({
     required List<CartItem> items,
     required String address,
     required String phone,
@@ -44,9 +44,9 @@ class OrderProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      final result = await ApiService.checkoutRemote(items, address, phone);
+      final order = await ApiService.checkoutRemote(items, address, phone);
       await loadOrders();
-      return result['id'];
+      return order;
     } catch (e) {
       _error = e.toString();
       rethrow;
@@ -81,14 +81,6 @@ class OrderProvider extends ChangeNotifier {
       debugPrint("Error updating order status: $e");
       notifyListeners();
       rethrow;
-    }
-  }
-
-  void markAsReviewed(String orderId) {
-    final index = _orders.indexWhere((o) => o.id == orderId);
-    if (index != -1) {
-      _orders[index].isReviewed = true;
-      notifyListeners();
     }
   }
 
