@@ -90,11 +90,8 @@ class _AddToCartState extends State<AddToCart> {
                       onTap: _isAdding ? null : () async {
                         setState(() => _isAdding = true);
                         try {
-                           // We need the full product list to refresh Provider properly locally. 
-                           // For now we pass a dummy empty list if we assume Provider will fetch its own. 
-                           // Actually addToCartRemote needs allProducts to rebuild local state correctly.
-                           // Simpler: Just refresh.
-                           await provider.addToCartRemote(widget.selectedSku, currentIndex, [], color: widget.selectedColor);
+                           // Call without passing the empty list, since CartProvider handles it locally now
+                           await provider.addToCartRemote(widget.selectedSku, currentIndex, color: widget.selectedColor);
                            if (!mounted) return;
                            ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(

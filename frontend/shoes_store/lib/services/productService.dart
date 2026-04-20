@@ -58,4 +58,48 @@ class ProductService {
     await prefs.remove(_cacheKey);
     debugPrint("DEBUG: Product cache invalidated");
   }
+
+  static Future<Map<String, dynamic>> searchProducts({
+    String? q,
+    String? category,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final uri = Uri.parse('${AuthService.baseUrl}/products/search').replace(queryParameters: {
+      if (q != null && q.isNotEmpty) 'q': q,
+      if (category != null && category != 'All') 'category': category,
+      'page': page.toString(),
+      'limit': limit.toString(),
+    });
+    try {
+      final response = await http.get(uri).timeout(const Duration(seconds: 7));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {
+          'items': (data['items'] as List).map((j) => Product.fromJson(j)).toList(),
+          'total': data['total'] as int,
+          'page': data['page'] as int,
+          'pages': data['pages'] as int,
+        };
+      }
+    } catch (e) {
+      debugPrint("DEBUG: searchProducts error: $e");
+    }
+    return {'items': <Product>[], 'total': 0, 'page': 1, 'pages': 1};
+  }
+
+  static Future<List<String>> getCategories() async {
+    try {
+      final response = await http
+          .get(Uri.parse('${AuthService.baseUrl}/categories'))
+          .timeout(const Duration(seconds: 7));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.cast<String>();
+      }
+    } catch (e) {
+      debugPrint("DEBUG: getCategories error: $e");
+    }
+    return [];
+  }
 }

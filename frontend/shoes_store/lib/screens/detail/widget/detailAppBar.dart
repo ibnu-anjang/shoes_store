@@ -7,7 +7,7 @@ class DetailAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final provider = FavoriteProvider.of(context);
+    final provider = FavoriteProvider.of(context, listen: true);
     return Padding(
       padding: const EdgeInsets.all(10),
     child: Row(children: [

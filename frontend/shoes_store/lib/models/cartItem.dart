@@ -25,4 +25,6 @@ class CartItem {
 
   String get selectedSize => sku.variantName;
   Color get selectedColor => color ?? Colors.black;
+
+  String get displayImage => product.getEffectiveThumbnail(color);
 }

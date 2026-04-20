@@ -1,17 +1,18 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shoes_store/widgets/fullScreenViewer.dart';
-import 'package:shoes_store/services/apiService.dart';
 import '../../../widgets/smartImage.dart';
 
 class ImageSlider extends StatefulWidget {
   final Function(int) onChange;
   final int currentSlide;
+  final List<String> images;
 
   const ImageSlider({
     super.key,
     required this.onChange,
     required this.currentSlide,
+    required this.images,
   });
 
   @override
@@ -19,34 +20,54 @@ class ImageSlider extends StatefulWidget {
 }
 
 class _ImageSliderState extends State<ImageSlider> {
-  List<String> sliderImages = [
+  late PageController _pageController;
+  Timer? _autoScrollTimer;
+  int _currentPage = 0;
+  
+  final List<String> _fallbacks = [
     "assets/promo1.jpg",
     "assets/promo2.jpg",
     "assets/promo3.jpg",
   ];
-  bool isLoading = true;
-  late PageController _pageController;
-  Timer? _autoScrollTimer;
-  int _currentPage = 0;
+
+  List<String> get _displayImages => widget.images.isNotEmpty ? widget.images : _fallbacks;
 
   @override
   void initState() {
     super.initState();
-    _pageController = PageController();
-    _fetchPromos();
+    _currentPage = widget.currentSlide;
+    _pageController = PageController(initialPage: _currentPage);
+    _startAutoScroll();
+  }
+
+  @override
+  void didUpdateWidget(ImageSlider oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Jika images baru masuk, restart timer
+    if (oldWidget.images.length != widget.images.length) {
+      _startAutoScroll();
+    }
   }
 
   void _startAutoScroll() {
     _autoScrollTimer?.cancel();
-    _autoScrollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (!mounted || sliderImages.isEmpty) return;
-      _currentPage = (_currentPage + 1) % sliderImages.length;
+    if (!mounted) return;
+    
+    _autoScrollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted || _displayImages.isEmpty) return;
+      
+      final nextPage = (_currentPage + 1) % _displayImages.length;
       _pageController.animateToPage(
-        _currentPage,
-        duration: const Duration(milliseconds: 400),
+        nextPage,
+        duration: const Duration(milliseconds: 600),
         curve: Curves.easeInOut,
       );
     });
+  }
+
+  void _onManualSwipe() {
+    // Reset timer saat user geser manual supaya tidak tiba-tiba loncat
+    _startAutoScroll();
   }
 
   @override
@@ -56,35 +77,8 @@ class _ImageSliderState extends State<ImageSlider> {
     super.dispose();
   }
 
-  Future<void> _fetchPromos() async {
-    try {
-      final promos = await ApiService.getPromos();
-      if (promos.isNotEmpty) {
-        setState(() {
-          sliderImages = promos.map((p) => ApiService.normalizeImage(p['image_url'].toString())).toList();
-        });
-      }
-    } catch (e) {
-      debugPrint("Failed loading dynamic promos: $e");
-    } finally {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-        _startAutoScroll();
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return const SizedBox(
-        height: 220,
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-    
     return Stack(
       children: [
         SizedBox(
@@ -92,24 +86,28 @@ class _ImageSliderState extends State<ImageSlider> {
           width: double.infinity,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(15),
-            child: PageView(
-              controller: _pageController,
-              scrollDirection: Axis.horizontal,
-              allowImplicitScrolling: true,
-              onPageChanged: (index) {
-                _currentPage = index;
-                widget.onChange(index);
-              },
-              physics: const ClampingScrollPhysics(),
-              children: sliderImages.map((imagePath) {
-                return GestureDetector(
-                  onTap: () => FullScreenViewer.show(context, imagePath),
-                  child: SmartImage(
-                    url: imagePath,
-                    fit: BoxFit.cover,
-                  ),
-                );
-              }).toList(),
+            child: Listener(
+              onPointerDown: (_) => _autoScrollTimer?.cancel(),
+              onPointerUp: (_) => _onManualSwipe(),
+              child: PageView(
+                controller: _pageController,
+                scrollDirection: Axis.horizontal,
+                allowImplicitScrolling: true,
+                onPageChanged: (index) {
+                  _currentPage = index;
+                  widget.onChange(index);
+                },
+                physics: const BouncingScrollPhysics(),
+                children: _displayImages.map((imagePath) {
+                  return GestureDetector(
+                    onTap: () => FullScreenViewer.show(context, imagePath),
+                    child: SmartImage(
+                      url: imagePath,
+                      fit: BoxFit.cover,
+                    ),
+                  );
+                }).toList(),
+              ),
             ),
           ),
         ),
@@ -120,7 +118,7 @@ class _ImageSliderState extends State<ImageSlider> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
-                sliderImages.length, 
+                _displayImages.length, 
                 (index) => AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   width: widget.currentSlide == index ? 15 : 8,

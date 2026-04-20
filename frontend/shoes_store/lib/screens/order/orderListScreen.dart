@@ -74,7 +74,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = OrderProvider.of(context);
+    final provider = OrderProvider.of(context, listen: true);
     final orders = provider.orders;
 
     return DefaultTabController(
@@ -260,7 +260,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                             ClipRRect(
                               borderRadius: BorderRadius.circular(10),
                               child: SmartImage(
-                                url: item.product.image,
+                                url: item.displayImage,
                                 width: 50,
                                 height: 50,
                                 fit: BoxFit.cover,
@@ -280,12 +280,36 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                  Text(
-                                    'Size ${item.selectedSize} • x${item.quantity}',
-                                    style: TextStyle(
-                                      color: Colors.grey.shade500,
-                                      fontSize: 12,
-                                    ),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        'Size ${item.selectedSize}',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade600,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        width: 8,
+                                        height: 8,
+                                        decoration: BoxDecoration(
+                                          color: item.selectedColor,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                              color: Colors.grey.shade300,
+                                              width: 0.5),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        '• x${item.quantity}',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade500,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),

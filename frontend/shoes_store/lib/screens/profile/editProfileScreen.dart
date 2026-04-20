@@ -39,16 +39,89 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
+  Future<void> _showImageSourcePicker() async {
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Text(
+                'Ubah Foto Profil',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _pickerOption(
+                    ctx,
+                    icon: Icons.camera_alt_outlined,
+                    label: 'Kamera',
+                    source: ImageSource.camera,
+                  ),
+                  _pickerOption(
+                    ctx,
+                    icon: Icons.photo_library_outlined,
+                    label: 'Galeri',
+                    source: ImageSource.gallery,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _pickerOption(BuildContext ctx, {required IconData icon, required String label, required ImageSource source}) {
+    return GestureDetector(
+      onTap: () async {
+        Navigator.pop(ctx);
+        await _pickImage(source);
+      },
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: kcontentColor,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 28, color: kprimaryColor),
+          ),
+          const SizedBox(height: 8),
+          Text(label, style: const TextStyle(fontSize: 13, color: Colors.black87)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    final pickedFile = await picker.pickImage(source: source);
 
     if (pickedFile != null) {
-      // Fitur Crop hanya tersedia di Mobile (Android/iOS)
       if (Platform.isAndroid || Platform.isIOS) {
         _cropImage(pickedFile.path);
       } else {
-        // Jika di Desktop (Linux/Windows), langsung gunakan fotonya
         setState(() {
           _tempImagePath = pickedFile.path;
         });
@@ -182,7 +255,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               const SizedBox(height: 20),
               Center(
                 child: GestureDetector(
-                  onTap: _pickImage,
+                  onTap: _showImageSourcePicker,
                   child: Stack(
                     children: [
                       CircleAvatar(

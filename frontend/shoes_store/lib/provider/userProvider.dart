@@ -3,10 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:shoes_store/services/apiService.dart';
 
 class UserProvider extends ChangeNotifier {
-  String _userId = "user_shoes_unique_123"; // ID Permanen untuk demo
+  String _userId = "";
   String _userName = "Shoes Store User";
-  String _email = "shoesstore@example.com";
-  String _password = "password123"; // Default for demo
+  String _email = "";
+  String _password = "";
   String? _profileImagePath;
 
   String get userId => _userId;

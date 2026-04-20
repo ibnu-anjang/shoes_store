@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:shoes_store/constant.dart';
 import 'package:shoes_store/provider/favoriteProvider.dart';
 import '../../widgets/smartImage.dart';
+import '../../screens/detail/detailScreen.dart';
+
 
 class FavoriteScreen extends StatefulWidget {
   const FavoriteScreen({super.key});
@@ -66,13 +68,22 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                 children: [
                   Padding(
                     padding: EdgeInsets.all(15),
-                    child: Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      padding: EdgeInsets.all(10),
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => DetailScreen(product: favoritItem),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        padding: EdgeInsets.all(10),
                       child: Row(
                         children: [
                           Container(
@@ -117,6 +128,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                           )
                         ],
                       ),
+                    ),
                     ),
                     ),
                     Positioned(

@@ -1,7 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shoes_store/models/productModel.dart';
-import 'package:shoes_store/models/category.dart' as model;
 import 'package:shoes_store/screens/home/widget/imageSlider.dart';
 import 'package:shoes_store/screens/home/widget/productCart.dart';
 import 'package:shoes_store/screens/home/widget/searchBar.dart';
@@ -9,6 +9,7 @@ import 'package:shoes_store/constant.dart';
 import 'package:shoes_store/screens/chatbot/chatBotScreen.dart';
 import 'package:shoes_store/provider/userProvider.dart';
 import 'package:shoes_store/services/productService.dart';
+import 'package:shoes_store/services/apiService.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,44 +20,116 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int currentSlider = 0;
-  List<Product> allProducts = [];
   List<Product> displayedProducts = [];
+  List<String> bannerImages = [];
+  List<String> categories = [];
   bool isLoading = true;
+  bool isLoadingMore = false;
   String selectedCategory = "All";
   String searchQuery = "";
-  List<model.Category> dynamicCategories = [model.Category(title: "All", image: "")];
+  int _currentPage = 1;
+  int _totalPages = 1;
+  int _totalProducts = 0;
+  Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
-    _loadProducts();
+    _loadInitial();
   }
 
-  Future<void> _loadProducts() async {
-    final results = await ProductService.getProducts();
-    debugPrint("DEBUG: Loaded ${results.length} products");
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadInitial() async {
+    setState(() => isLoading = true);
+
+    final results = await Future.wait([
+      ProductService.searchProducts(page: 1, limit: 20),
+      ProductService.getCategories(),
+      _fetchBanners(),
+    ]);
+
     if (mounted) {
+      final searchResult = results[0] as Map<String, dynamic>;
+      final cats = results[1] as List<String>;
+      final banners = results[2] as List<String>;
       setState(() {
-        allProducts = results;
-        displayedProducts = results;
-        final categoriesSet = results.map((p) => p.category).toSet();
-        dynamicCategories = [model.Category(title: "All", image: "")] 
-          ..addAll(categoriesSet.map((c) => model.Category(title: c, image: "")));
+        displayedProducts = searchResult['items'] as List<Product>;
+        _totalProducts = searchResult['total'] as int;
+        _totalPages = searchResult['pages'] as int;
+        _currentPage = 1;
+        categories = cats;
+        bannerImages = banners;
         isLoading = false;
       });
     }
   }
 
-  void _filterProducts() {
-    setState(() {
-      displayedProducts = allProducts.where((product) {
-        final matchesCategory = selectedCategory == "All" || 
-                                product.category.trim().toLowerCase() == selectedCategory.trim().toLowerCase();
-        final matchesSearch = product.title.trim().toLowerCase().contains(searchQuery.trim().toLowerCase());
-        return matchesCategory && matchesSearch;
-      }).toList();
+  Future<List<String>> _fetchBanners() async {
+    try {
+      final promos = await ApiService.getPromos();
+      if (promos.isNotEmpty) {
+        return promos.map((p) => ApiService.normalizeImage(p['image_url'].toString())).toList();
+      }
+    } catch (e) {
+      debugPrint("Error loading promos: $e");
+    }
+    return [];
+  }
+
+  Future<void> _search({bool reset = true}) async {
+    if (reset) {
+      setState(() {
+        isLoading = true;
+        _currentPage = 1;
+      });
+    } else {
+      setState(() => isLoadingMore = true);
+    }
+
+    final result = await ProductService.searchProducts(
+      q: searchQuery.isEmpty ? null : searchQuery,
+      category: selectedCategory == "All" ? null : selectedCategory,
+      page: _currentPage,
+      limit: 20,
+    );
+
+    if (mounted) {
+      setState(() {
+        if (reset) {
+          displayedProducts = result['items'] as List<Product>;
+        } else {
+          displayedProducts.addAll(result['items'] as List<Product>);
+        }
+        _totalProducts = result['total'] as int;
+        _totalPages = result['pages'] as int;
+        isLoading = false;
+        isLoadingMore = false;
+      });
+    }
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      searchQuery = value;
+      _search();
     });
-    debugPrint("DEBUG: Filtered to ${displayedProducts.length} products (Category: $selectedCategory, Search: $searchQuery)");
+  }
+
+  void _onCategoryChanged(String category) {
+    setState(() => selectedCategory = category);
+    _search();
+  }
+
+  Future<void> _loadMore() async {
+    if (_currentPage >= _totalPages || isLoadingMore) return;
+    _currentPage++;
+    await _search(reset: false);
   }
 
   String _getGreeting() {
@@ -74,12 +147,11 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: kcontentColor,
       body: RefreshIndicator(
-        onRefresh: _loadProducts,
+        onRefresh: _loadInitial,
         color: kprimaryColor,
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            // ── Gradient App Bar / Header ──────────────────────────────
             SliverToBoxAdapter(
               child: Container(
                 decoration: const BoxDecoration(
@@ -97,17 +169,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Logo + greeting + AI button dalam satu baris
                     Row(
                       children: [
                         Container(
-                          width: 30,
-                          height: 30,
+                          width: 35,
+                          height: 35,
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Icon(Icons.storefront_rounded, color: kprimaryColor, size: 18),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.asset('assets/logo.png', fit: BoxFit.cover),
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -132,25 +206,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    // Search bar di dalam header
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(30),
                         boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withAlpha(25),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
+                          BoxShadow(color: Colors.black.withAlpha(25), blurRadius: 10, offset: const Offset(0, 4)),
                         ],
                       ),
                       child: MySearchBar(
                         onFilterTap: null,
-                        onChanged: (value) {
-                          searchQuery = value;
-                          _filterProducts();
-                        },
+                        onChanged: _onSearchChanged,
                       ),
                     ),
                   ],
@@ -158,91 +224,35 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // ── Body ────────────────────────────────────────────────────
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
                   const SizedBox(height: 20),
 
-                  // Offline Banner
-                  if (!isLoading && ProductService.isOfflineData)
-                    Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.only(bottom: 15),
-                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.orange.shade300),
-                      ),
-                      child: const Row(
+                  // Category chips
+                  if (categories.isNotEmpty)
+                    SizedBox(
+                      height: 40,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
                         children: [
-                          Icon(Icons.cloud_off, color: Colors.orange, size: 18),
-                          SizedBox(width: 8),
-                          Text(
-                            "Mode Offline: Menampilkan data simpanan",
-                            style: TextStyle(
-                              color: Colors.orange,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
+                          _buildCategoryChip("All"),
+                          ...categories.map(_buildCategoryChip),
                         ],
                       ),
                     ),
 
-                  // Categories
-                  SizedBox(
-                    height: 40,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: dynamicCategories.length,
-                      itemBuilder: (context, index) {
-                        final category = dynamicCategories[index];
-                        final isSelected = selectedCategory == category.title;
-                        return GestureDetector(
-                          onTap: () => setState(() {
-                            selectedCategory = category.title;
-                            _filterProducts();
-                          }),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            margin: const EdgeInsets.only(right: 10),
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            decoration: BoxDecoration(
-                              color: isSelected ? kprimaryColor : Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: isSelected
-                                  ? [BoxShadow(color: kprimaryColor.withAlpha(77), blurRadius: 8, offset: const Offset(0, 3))]
-                                  : [BoxShadow(color: Colors.black.withAlpha(13), blurRadius: 4)],
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              category.title,
-                              style: TextStyle(
-                                color: isSelected ? Colors.white : Colors.black54,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
                   const SizedBox(height: 20),
 
-                  // Promo Slider
                   ImageSlider(
+                    images: bannerImages,
                     currentSlide: currentSlider,
                     onChange: (value) => setState(() => currentSlider = value),
                   ),
 
                   const SizedBox(height: 20),
 
-                  // Section title
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -251,14 +261,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
                       ),
                       Text(
-                        "${displayedProducts.length} produk",
+                        "$_totalProducts produk",
                         style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
                       ),
                     ],
                   ),
                   const SizedBox(height: 15),
 
-                  // Product Grid
                   isLoading
                       ? const Center(
                           child: Padding(
@@ -266,7 +275,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: CircularProgressIndicator(color: kprimaryColor),
                           ),
                         )
-                      : (displayedProducts.isEmpty
+                      : displayedProducts.isEmpty
                           ? _buildEmptyState()
                           : GridView.builder(
                               physics: const NeverScrollableScrollPhysics(),
@@ -278,15 +287,60 @@ class _HomeScreenState extends State<HomeScreen> {
                                 mainAxisSpacing: 15,
                               ),
                               itemCount: displayedProducts.length,
-                              itemBuilder: (context, index) =>
-                                  ProductCard(product: displayedProducts[index]),
-                            )),
+                              itemBuilder: (context, index) => ProductCard(product: displayedProducts[index]),
+                            ),
+
+                  // Load More
+                  if (!isLoading && _currentPage < _totalPages)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Center(
+                        child: isLoadingMore
+                            ? const CircularProgressIndicator(color: kprimaryColor)
+                            : TextButton.icon(
+                                onPressed: _loadMore,
+                                icon: const Icon(Icons.expand_more, color: kprimaryColor),
+                                label: Text(
+                                  "Muat lebih banyak (${_totalProducts - displayedProducts.length} lagi)",
+                                  style: const TextStyle(color: kprimaryColor, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                      ),
+                    ),
 
                   const SizedBox(height: 30),
                 ]),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryChip(String title) {
+    final isSelected = selectedCategory == title;
+    return GestureDetector(
+      onTap: () => _onCategoryChanged(title),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.only(right: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        decoration: BoxDecoration(
+          color: isSelected ? kprimaryColor : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: isSelected
+              ? [BoxShadow(color: kprimaryColor.withAlpha(77), blurRadius: 8, offset: const Offset(0, 3))]
+              : [BoxShadow(color: Colors.black.withAlpha(13), blurRadius: 4)],
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          title,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.black54,
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
         ),
       ),
     );
@@ -316,11 +370,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 10),
           Text(
             "Produk tidak ditemukan",
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade500,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 16, color: Colors.grey.shade500, fontWeight: FontWeight.bold),
           ),
         ],
       ),

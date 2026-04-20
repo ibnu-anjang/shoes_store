@@ -7,7 +7,6 @@ import 'package:shoes_store/models/cartItem.dart';
 import 'package:shoes_store/provider/orderProvider.dart';
 import 'package:shoes_store/provider/reviewProvider.dart';
 import 'package:shoes_store/provider/userProvider.dart';
-import 'package:shoes_store/services/apiService.dart';
 import '../../widgets/smartImage.dart';
 
 class ReviewScreen extends StatefulWidget {
@@ -37,7 +36,6 @@ class _ReviewScreenState extends State<ReviewScreen> {
   bool _isSubmitting = false;
   String? _tempImagePath;
   String? _profileImagePath;
-  bool _isUploadingProfile = false;
 
   @override
   void initState() {
@@ -58,7 +56,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
     super.dispose();
   }
 
-  Future<void> _showProfileImagePicker() async {
+  Future<void> _showImageSourcePicker() async {
     await showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -81,7 +79,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 ),
               ),
               const Text(
-                'Ubah Foto Profil',
+                'Tambah Foto Ulasan',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const SizedBox(height: 20),
@@ -114,7 +112,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
     return GestureDetector(
       onTap: () async {
         Navigator.pop(ctx);
-        await _pickProfileImage(source);
+        await _pickImage(source);
       },
       child: Column(
         children: [
@@ -133,38 +131,9 @@ class _ReviewScreenState extends State<ReviewScreen> {
     );
   }
 
-  Future<void> _pickProfileImage(ImageSource source) async {
+  Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: source, imageQuality: 80);
-    if (pickedFile == null) return;
-    setState(() {
-      _profileImagePath = pickedFile.path;
-      _isUploadingProfile = true;
-    });
-    try {
-      final result = await ApiService.uploadProfilePicture(pickedFile.path);
-      final user = result['user'];
-      if (user != null && mounted) {
-        final userProvider = UserProvider.of(context, listen: false);
-        final normalizedUrl = ApiService.normalizeImage(user['profile_image']?.toString() ?? '');
-        await userProvider.updateProfile(imagePath: pickedFile.path);
-        setState(() => _profileImagePath = normalizedUrl.isNotEmpty ? normalizedUrl : pickedFile.path);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal upload foto: $e'), backgroundColor: Colors.red),
-        );
-        setState(() => _profileImagePath = null);
-      }
-    } finally {
-      if (mounted) setState(() => _isUploadingProfile = false);
-    }
-  }
-
-  Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    final pickedFile = await picker.pickImage(source: source);
     if (pickedFile != null) {
       if (Platform.isAndroid || Platform.isIOS) {
         _cropImage(pickedFile.path);
@@ -283,35 +252,13 @@ class _ReviewScreenState extends State<ReviewScreen> {
     }
 
     return Center(
-      child: Stack(
-        children: [
-          CircleAvatar(
-            radius: 42,
-            backgroundColor: Colors.grey.shade300,
-            backgroundImage: imageProvider,
-            child: _isUploadingProfile
-                ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                : imageProvider == null
-                    ? const Icon(Icons.person, size: 45, color: Colors.white)
-                    : null,
-          ),
-          Positioned(
-            bottom: 0,
-            right: 0,
-            child: GestureDetector(
-              onTap: _isUploadingProfile ? null : _showProfileImagePicker,
-              child: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: kprimaryColor,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
-                child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
-              ),
-            ),
-          ),
-        ],
+      child: CircleAvatar(
+        radius: 42,
+        backgroundColor: Colors.grey.shade300,
+        backgroundImage: imageProvider,
+        child: imageProvider == null
+            ? const Icon(Icons.person, size: 45, color: Colors.white)
+            : null,
       ),
     );
   }
@@ -353,7 +300,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
                       child: SmartImage(
-                        url: widget.item.product.image,
+                        url: widget.item.displayImage,
                         width: 60,
                         height: 60,
                         fit: BoxFit.cover,
@@ -522,7 +469,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 const SizedBox(height: 15),
                 if (_tempImagePath == null)
                   GestureDetector(
-                    onTap: _pickImage,
+                    onTap: _showImageSourcePicker,
                     child: Container(
                       width: 100,
                       height: 100,

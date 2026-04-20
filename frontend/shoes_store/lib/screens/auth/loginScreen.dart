@@ -97,7 +97,15 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 60),
+                  const SizedBox(height: 40),
+                  Center(
+                    child: Image.asset(
+                      'assets/logo.png',
+                      height: 120,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                  const SizedBox(height: 30),
                   const Text(
                     'Welcome Back',
                     style: TextStyle(

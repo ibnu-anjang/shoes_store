@@ -14,7 +14,6 @@ from typing import List, Optional
 from passlib.context import CryptContext
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-import google.generativeai as genai
 from dotenv import load_dotenv
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -38,14 +37,6 @@ ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY", "")
 if not ADMIN_SECRET_KEY:
     logger.warning("ADMIN_SECRET_KEY tidak di-set! Endpoint admin tidak terproteksi.")
 
-GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY")
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    model_ai = genai.GenerativeModel('gemini-1.5-flash')
-    logger.info("Gemini AI model loaded.")
-else:
-    model_ai = None
-    logger.warning("GOOGLE_API_KEY tidak ditemukan, chatbot fallback ke mode keyword.")
 
 # ---------------------------------------------------------------------------
 # File upload validation
@@ -100,6 +91,8 @@ with database.engine.connect() as _conn:
         "ALTER TABLE orders ADD COLUMN shipped_at DATETIME NULL",
         "ALTER TABLE orders ADD COLUMN payment_method VARCHAR(20) NULL",
         "ALTER TABLE orders ADD COLUMN tracking_number VARCHAR(100) NULL",
+        "ALTER TABLE product_colors ADD COLUMN image_url VARCHAR(255) NULL",
+        "ALTER TABLE product_images ADD COLUMN color_hex VARCHAR(50) NULL",
     ]:
         try:
             _conn.execute(text(col_sql))
@@ -158,6 +151,9 @@ def _enrich_order_items(orders, user_id: int = None, db: Session = None):
         order_dict = {
             "id": order.id,
             "user_id": order.user_id,
+            "username": order.user.username if order.user else None,
+            "email": order.user.email if order.user else None,
+            "profile_image": order.user.profile_image if order.user else None,
             "total": order.total,
             "subtotal": order.subtotal,
             "unique_code": order.unique_code,
@@ -189,16 +185,30 @@ def _enrich_order_items(orders, user_id: int = None, db: Session = None):
                 "sku_id": item.sku_id,
                 "quantity": item.quantity,
                 "price_at_checkout": item.price_at_checkout,
+                "color_hex": item.color_hex,
                 "product_id": None,
                 "product_name": None,
                 "product_image": None,
                 "variant_name": None,
             }
             if item.sku and item.sku.product:
-                item_dict["product_id"] = item.sku.product.id
-                item_dict["product_name"] = item.sku.product.name
-                item_dict["product_image"] = item.sku.product.image
+                product = item.sku.product
+                item_dict["product_id"] = product.id
+                item_dict["product_name"] = product.name
                 item_dict["variant_name"] = item.sku.variant_name
+                
+                # Logic: Search gallery for color-specific image
+                color_image = None
+                if item.color_hex:
+                    # Find image in gallery that matches the color_hex
+                    for gallery_img in product.gallery:
+                        if gallery_img.color_hex == item.color_hex:
+                            color_image = gallery_img.image_url
+                            break
+                
+                # Fallback to main product image if no color-specific image found
+                item_dict["product_image"] = color_image if color_image else product.image
+                
             order_dict["items"].append(item_dict)
 
         result.append(order_dict)
@@ -351,6 +361,33 @@ def get_user_profile(username: str, db: Session = Depends(database.get_db)):
 def get_all_products(db: Session = Depends(database.get_db)):
     return db.query(models.Product).all()
 
+@app.get("/products/search", response_model=schemas.PaginatedProductResponse)
+def search_products(
+    q: Optional[str] = None,
+    category: Optional[str] = None,
+    page: int = 1,
+    limit: int = 20,
+    db: Session = Depends(database.get_db),
+):
+    query = db.query(models.Product).filter(models.Product.is_active == True)
+    if q:
+        query = query.filter(models.Product.name.ilike(f"%{q}%"))
+    if category and category != "All":
+        query = query.filter(models.Product.category == category)
+    total = query.count()
+    pages = max(1, -(-total // limit))  # ceiling division
+    items = query.offset((page - 1) * limit).limit(limit).all()
+    return {"items": items, "total": total, "page": page, "pages": pages}
+
+@app.get("/categories", response_model=List[str])
+def get_categories(db: Session = Depends(database.get_db)):
+    rows = db.query(models.Product.category).filter(
+        models.Product.is_active == True,
+        models.Product.category != None,
+        models.Product.category != "",
+    ).distinct().all()
+    return sorted([r[0] for r in rows])
+
 @app.post("/products", response_model=schemas.ProductResponse)
 def create_product(product: schemas.ProductCreate, db: Session = Depends(database.get_db)):
     new_product = models.Product(
@@ -379,7 +416,7 @@ def create_product(product: schemas.ProductCreate, db: Session = Depends(databas
         db.add(sku)
 
     for clr in product.colors:
-        color_entry = models.ProductColor(product_id=new_product.id, color_hex=clr.color_hex)
+        color_entry = models.ProductColor(product_id=new_product.id, color_hex=clr.color_hex, image_url=clr.image_url)
         db.add(color_entry)
 
     db.commit()
@@ -857,6 +894,47 @@ async def admin_upload_product_image(
     logger.info(f"Foto produk {product_id} diupdate: {file_path}")
     return {"message": "Foto berhasil diupdate", "image_url": f"/{file_path}"}
 
+@app.post("/admin/products/{product_id}/colors/{color_hex}/image", tags=["Admin"])
+async def admin_upload_color_image(
+    product_id: int,
+    color_hex: str,
+    file: UploadFile = File(...),
+    _: None = Depends(verify_admin),
+    db: Session = Depends(database.get_db)
+):
+    """Admin upload image for specific color. color_hex should be e.g. 0xFF000000"""
+    product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Produk tidak ditemukan")
+
+    h = color_hex
+    if not h.startswith("0xFF"):
+        h = "0xFF" + h.replace("#", "").upper()
+        
+    color_record = db.query(models.ProductColor).filter(
+        models.ProductColor.product_id == product_id, 
+        models.ProductColor.color_hex == h
+    ).first()
+    
+    if not color_record:
+        raise HTTPException(status_code=404, detail="Warna tidak ditemukan di produk ini")
+
+    content = await read_and_validate_image(file)
+    ext = os.path.splitext(file.filename or ".jpg")[1] or ".jpg"
+    safe_filename = f"color_{product_id}_{uuid.uuid4().hex[:8]}{ext}"
+    file_path = f"uploads/{safe_filename}"
+
+    try:
+        with open(file_path, "wb") as buffer:
+            buffer.write(content)
+    except Exception as e:
+        logger.error(f"Gagal menyimpan foto warna {product_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Gagal menyimpan file.")
+
+    color_record.image_url = file_path
+    db.commit()
+    return {"message": "Foto warna diupdate", "image_url": f"/{file_path}"}
+
 
 @app.delete("/admin/products/{product_id}", tags=["Admin"])
 def admin_delete_product(product_id: int, _: None = Depends(verify_admin), db: Session = Depends(database.get_db)):
@@ -897,7 +975,35 @@ def admin_update_product(
         # Ganti semua warna yang ada dengan list yang baru
         db.query(models.ProductColor).filter(models.ProductColor.product_id == product_id).delete()
         for c in payload.colors:
-            db.add(models.ProductColor(product_id=product_id, color_hex=c.color_hex))
+            db.add(models.ProductColor(product_id=product_id, color_hex=c.color_hex, image_url=c.image_url))
+
+    if payload.skus is not None:
+        for s_data in payload.skus:
+            if s_data.id:
+                # Update existing SKU
+                sku = db.query(models.ProductSku).filter(models.ProductSku.id == s_data.id).first()
+                if sku:
+                    if s_data.variant_name is not None: sku.variant_name = s_data.variant_name
+                    if s_data.color_hex is not None: sku.color_hex = s_data.color_hex if s_data.color_hex != 'null' else None
+                    if s_data.price is not None: sku.price = s_data.price
+                    if s_data.stock_available is not None: sku.stock_available = s_data.stock_available
+            else:
+                # Add new SKU if ID is missing (though usually handled elsewhere)
+                new_sku = models.ProductSku(
+                    product_id=product_id,
+                    variant_name=s_data.variant_name or "Default",
+                    color_hex=s_data.color_hex if s_data.color_hex != 'null' else None,
+                    price=s_data.price or product.price,
+                    stock_available=s_data.stock_available or 0,
+                    stock_reserved=0
+                )
+                db.add(new_sku)
+
+    if payload.gallery is not None:
+        for img_data in payload.gallery:
+            img = db.query(models.ProductImage).filter(models.ProductImage.id == img_data.id).first()
+            if img:
+                img.color_hex = img_data.color_hex if img_data.color_hex != 'null' else None
 
     db.commit()
     db.refresh(product)
@@ -1038,24 +1144,27 @@ def get_user_favorites(username: str = Depends(get_current_user), db: Session = 
 # Chatbot
 # ---------------------------------------------------------------------------
 @app.post("/chat", response_model=schemas.ChatResponse)
-def chat_with_bot(request: schemas.ChatRequest):
-    msg = request.message.lower()
-    if model_ai:
-        try:
-            context = "Kamu adalah Sneakerhead Assistant dari toko Shoes Store. Jawab ramah dan profesional. "
-            response = model_ai.generate_content(context + msg)
-            return {"reply": response.text}
-        except Exception as e:
-            logger.warning(f"Gemini AI error, fallback ke keyword: {e}")
+def chat_with_bot(request: schemas.ChatRequest, db: Session = Depends(database.get_db)):
+    from app.ollama_service import OllamaService
 
-    if "promo" in msg or "diskon" in msg:
-        reply = "Tentu! Saat ini ada promo diskon 20% untuk semua koleksi Jordan. Gunakan kode: SHOES20."
-    elif "stok" in msg or "ready" in msg:
-        reply = "Kami memakai sistem Live Stock! Barang yang bisa masuk keranjang pasti Ready."
-    else:
-        reply = "Untuk order, tambahkan ke keranjang lalu lengkapi pembayaran. Akan divalidasi admin."
+    product_context = ""
+    msg_lower = request.message.lower()
+    keywords = ["stok", "stock", "ada", "tersedia", "harga", "price", "ukuran", "size", "produk", "sepatu", "nike", "adidas", "vans", "converse"]
+    if any(k in msg_lower for k in keywords):
+        products = db.query(models.Product).filter(models.Product.is_active == True).limit(20).all()
+        if products:
+            lines = []
+            for p in products:
+                skus = db.query(models.ProductSku).filter(models.ProductSku.product_id == p.id).all()
+                sku_info = ", ".join(
+                    f"{s.variant_name} (stok: {s.stock_available}, harga: Rp{int(s.price):,})"
+                    for s in skus if s.stock_available > 0
+                ) or "stok habis"
+                lines.append(f"- {p.name} | {p.category or 'sepatu'} | {sku_info}")
+            product_context = "\n".join(lines)
+
+    reply = OllamaService.generate_chat(request.message, product_context)
     return {"reply": reply}
-
 
 # ---------------------------------------------------------------------------
 # Addresses
@@ -1130,6 +1239,12 @@ def delete_address(address_id: str, username: str = Depends(get_current_user), d
 # ---------------------------------------------------------------------------
 # Reviews
 # ---------------------------------------------------------------------------
+def _recalculate_product_rating(product_id: int, db: Session):
+    reviews = db.query(models.Review).filter(models.Review.product_id == product_id).all()
+    product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    if product:
+        product.rating = round(sum(r.rating for r in reviews) / len(reviews), 1) if reviews else 0.0
+
 def _enrich_review(review, db: Session) -> dict:
     """Tambahkan username dan profile_picture ke dict review."""
     user = db.query(models.User).filter(models.User.id == review.user_id).first()
@@ -1216,6 +1331,8 @@ async def add_review(
             action="ADD_REVIEW",
             details=f"Review untuk produk {product_id} (order_item {order_item_id})"
         ))
+        db.flush()
+        _recalculate_product_rating(product_id, db)
         db.commit()
         db.refresh(new_rev)
         return _enrich_review(new_rev, db)
@@ -1259,6 +1376,8 @@ async def update_review(
 
     review.rating = rating
     review.comment = comment
+    db.flush()
+    _recalculate_product_rating(review.product_id, db)
     db.commit()
     db.refresh(review)
     logger.info(f"Review {review_id} diupdate oleh {username}")
@@ -1276,7 +1395,10 @@ def delete_review(review_id: str, username: str = Depends(get_current_user), db:
     ).first()
     if not review:
         raise HTTPException(status_code=404, detail="Ulasan tidak ditemukan atau bukan milikmu")
+    product_id = review.product_id
     db.delete(review)
+    db.flush()
+    _recalculate_product_rating(product_id, db)
     db.commit()
     logger.info(f"Review {review_id} dihapus oleh {username}")
     return {"status": "ok"}
@@ -1340,6 +1462,60 @@ def get_promos(db: Session = Depends(database.get_db)):
     """Mendapatkan daftar promo banner home."""
     return db.query(models.PromoBanner).filter(models.PromoBanner.is_active == True).all()
 
+@app.post("/admin/promos", tags=["Admin"])
+async def admin_add_promo(
+    files: List[UploadFile] = File(...),
+    _: None = Depends(verify_admin),
+    db: Session = Depends(database.get_db)
+):
+    """Admin upload promo banner baru (multiple files)"""
+    new_promos = []
+    
+    for file in files:
+        content = await file.read()
+        if len(content) > 5 * 1024 * 1024:
+            continue
+        
+        ext = os.path.splitext(file.filename or ".jpg")[1] or ".jpg"
+        safe_filename = f"promo_{uuid.uuid4().hex[:8]}{ext}"
+        file_path = f"/uploads/{safe_filename}"
+        full_path = f"uploads/{safe_filename}"
+        
+        with open(full_path, "wb") as f:
+            f.write(content)
+            
+        promo = models.PromoBanner(image_url=file_path, is_active=True)
+        db.add(promo)
+        new_promos.append(promo)
+        
+    db.commit()
+    for p in new_promos:
+        db.refresh(p)
+    return new_promos
+
+
+@app.delete("/admin/promos/{promo_id}", tags=["Admin"])
+def admin_delete_promo(
+    promo_id: int,
+    _: None = Depends(verify_admin),
+    db: Session = Depends(database.get_db)
+):
+    """Admin hapus promo banner"""
+    promo = db.query(models.PromoBanner).filter(models.PromoBanner.id == promo_id).first()
+    if not promo:
+        raise HTTPException(status_code=404, detail="Promo tidak ditemukan")
+    
+    # Hapus file fisik jika ada
+    if promo.image_url:
+        path = promo.image_url.lstrip("/")
+        if os.path.exists(path):
+            try: os.remove(path)
+            except: pass
+        
+    db.delete(promo)
+    db.commit()
+    return {"message": "Promo berhasil dihapus"}
+
 # ---------------------------------------------------------------------------
 # Payment Config (info TF & QRIS, bisa diedit lewat admin panel)
 # ---------------------------------------------------------------------------
@@ -1401,11 +1577,19 @@ async def upload_qris_image(
 async def upload_product_gallery(
     product_id: int,
     files: List[UploadFile] = File(...),
+    color_hex: Optional[str] = Form(None),
     db: Session = Depends(database.get_db),
     _: None = Depends(verify_admin),
 ):
     """Upload multiple gambar ke galeri produk."""
     urls = []
+    
+    h = None
+    if color_hex and color_hex.strip() != '' and color_hex != 'null':
+        h = color_hex.strip()
+        if not h.startswith("0xFF"):
+            h = "0xFF" + h.replace("#", "").upper()
+            
     for file in files:
         content = await read_and_validate_image(file)
         filename = f"gallery_{uuid.uuid4().hex[:8]}.png"
@@ -1414,11 +1598,84 @@ async def upload_product_gallery(
             f.write(content)
         
         url = f"/uploads/{filename}"
-        db.add(models.ProductImage(product_id=product_id, image_url=url))
+        db.add(models.ProductImage(product_id=product_id, image_url=url, color_hex=h))
         urls.append(url)
     
     db.commit()
     return {"message": f"{len(urls)} foto ditambahkan ke galeri", "urls": urls}
+
+@app.delete("/admin/products/{product_id}/gallery/{image_id}", tags=["Products"])
+def delete_gallery_image(
+    product_id: int, 
+    image_id: int, 
+    db: Session = Depends(database.get_db),
+    _: None = Depends(verify_admin)
+):
+    """Admin menghapus gambar galeri/warna produk."""
+    img = db.query(models.ProductImage).filter(
+        models.ProductImage.id == image_id, 
+        models.ProductImage.product_id == product_id
+    ).first()
+    if not img:
+        raise HTTPException(status_code=404, detail="Gambar tidak ditemukan")
+        
+    try:
+        path = img.image_url.lstrip("/")
+        if os.path.exists(path):
+            os.remove(path)
+    except Exception as e:
+        logger.warning(f"Gagal hapus file fisik gallery: {e}")
+
+    db.delete(img)
+    db.commit()
+    return {"status": "deleted"}
+
+@app.put("/admin/products/{product_id}/gallery/{image_id}", tags=["Products"])
+def update_gallery_image_role(
+    product_id: int, 
+    image_id: int, 
+    payload: schemas.ImageRoleUpdate,
+    db: Session = Depends(database.get_db),
+    _: None = Depends(verify_admin)
+):
+    """Ubah color_hex (peran) dari sebuah image."""
+    img = db.query(models.ProductImage).filter(
+        models.ProductImage.id == image_id, 
+        models.ProductImage.product_id == product_id
+    ).first()
+    if not img:
+        raise HTTPException(status_code=404, detail="Gambar tidak ditemukan")
+        
+    h = None
+    if payload.color_hex and payload.color_hex.strip() != '' and payload.color_hex != 'null':
+        h = payload.color_hex.strip()
+        if not h.startswith("0xFF"):
+            h = "0xFF" + h.replace("#", "").upper()
+            
+    img.color_hex = h
+    db.commit()
+    return {"status": "updated", "color_hex": h}
+
+@app.patch("/admin/products/{product_id}/thumbnail/{image_id}", tags=["Products"])
+def set_product_thumbnail_from_gallery(
+    product_id: int,
+    image_id: int,
+    db: Session = Depends(database.get_db),
+    _: None = Depends(verify_admin)
+):
+    """Set foto utama produk dari salah satu foto di galeri."""
+    product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    img = db.query(models.ProductImage).filter(
+        models.ProductImage.id == image_id,
+        models.ProductImage.product_id == product_id
+    ).first()
+    
+    if not product or not img:
+        raise HTTPException(status_code=404, detail="Produk atau Gambar tidak ditemukan")
+    
+    product.image = img.image_url
+    db.commit()
+    return {"status": "thumbnail_updated", "url": img.image_url}
 
 @app.get("/admin/all-products", tags=["Products"])
 def get_all_products_admin(db: Session = Depends(database.get_db), _: None = Depends(verify_admin)):

@@ -1,1 +1,0 @@
-kalau misal di build apk masih gabisa konek ke server gitu gabisa login lah intinya daftar juga kaga, sama halnya kalau run di web juga gitu di luar device dan jaringan yg berbeda. nah kalau kita baru login atau create account itu kita gabisa liat review dari users lain harus dipancing dengan membeli baru muncul. sedangkan harusnya ga gitu selebihnya aman aja. 

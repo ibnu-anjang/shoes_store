@@ -60,6 +60,7 @@ class MyApp extends StatelessWidget {
       ChangeNotifierProvider(create: (_) => UserProvider()),
     ],
     child: MaterialApp(
+      title: 'Shoes Store',
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       scrollBehavior: const MaterialScrollBehavior().copyWith(

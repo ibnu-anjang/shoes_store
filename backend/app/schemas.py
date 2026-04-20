@@ -22,6 +22,7 @@ class ProductSkuResponse(ProductSkuBase):
 
 class ProductColorBase(BaseModel):
     color_hex: str
+    image_url: Optional[str] = None
 
 class ProductColorCreate(ProductColorBase):
     pass
@@ -35,8 +36,12 @@ class ProductColorResponse(ProductColorBase):
 class ProductImageResponse(BaseModel):
     id: int
     image_url: str
+    color_hex: Optional[str] = None
     class Config:
         from_attributes = True
+
+class ImageRoleUpdate(BaseModel):
+    color_hex: Optional[str] = None
 
 # --- PRODUCT SCHEMAS ---
 class ProductBase(BaseModel):
@@ -61,6 +66,12 @@ class ProductResponse(ProductBase):
     gallery: List[ProductImageResponse] = []
     class Config:
         from_attributes = True
+
+class PaginatedProductResponse(BaseModel):
+    items: List[ProductResponse]
+    total: int
+    page: int
+    pages: int
 
 
 # --- USER SCHEMAS ---
@@ -212,11 +223,25 @@ class OrderResponse(OrderBase):
     tracking_number: Optional[str] = None
     shipping_address: Optional[str] = None
     phone: Optional[str] = None
+    username: Optional[str] = None
+    email: Optional[str] = None
+    profile_image: Optional[str] = None
     items: List[OrderItemResponse] = []
     payment: Optional[PaymentConfirmationResponse] = None
     reviewed_item_ids: List[int] = []
     class Config:
         from_attributes = True
+
+class ProductSkuUpdate(BaseModel):
+    id: Optional[int] = None
+    variant_name: Optional[str] = None
+    color_hex: Optional[str] = None
+    price: Optional[float] = None
+    stock_available: Optional[int] = None
+
+class ProductImageUpdate(BaseModel):
+    id: int
+    color_hex: Optional[str] = None
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
@@ -225,6 +250,8 @@ class ProductUpdate(BaseModel):
     category: Optional[str] = None
     specification: Optional[str] = None
     colors: Optional[List[ProductColorCreate]] = None
+    skus: Optional[List[ProductSkuUpdate]] = None
+    gallery: Optional[List[ProductImageUpdate]] = None
 
 # --- CHAT SCHEMAS ---
 class ChatRequest(BaseModel):

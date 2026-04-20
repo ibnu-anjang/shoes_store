@@ -148,7 +148,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = OrderProvider.of(context);
+    final provider = OrderProvider.of(context, listen: true);
     final currentOrder = provider.orders.firstWhere(
       (o) => o.id == widget.order.id,
       orElse: () => widget.order,
@@ -179,8 +179,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(15),
+      body: RefreshIndicator(
+        onRefresh: () => provider.loadOrders(),
+        color: kprimaryColor,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(15),
         child: Column(
           children: [
             _buildStatusTimeline(currentOrder),
@@ -260,7 +264,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ],
         ),
       ),
-    );
+    ),
+   );
   }
 
   Widget _buildCodProcessingCard() {
@@ -843,7 +848,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: SmartImage(url: item.product.image, width: 60, height: 60, fit: BoxFit.cover),
+                      child: SmartImage(url: item.displayImage, width: 60, height: 60, fit: BoxFit.cover),
                     ),
                     const SizedBox(width: 12),
                     Expanded(

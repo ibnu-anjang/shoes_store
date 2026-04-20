@@ -523,7 +523,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             leading: ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: SmartImage(
-                url: item.product.image,
+                url: item.displayImage,
                 width: 60,
                 height: 60,
                 fit: BoxFit.cover,

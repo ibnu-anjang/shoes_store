@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shoes_store/models/cartItem.dart';
 import 'package:shoes_store/models/productModel.dart';
-import 'package:shoes_store/services/apiService.dart';
 import '../../widgets/smartImage.dart';
 import 'package:shoes_store/screens/detail/detailScreen.dart';
 import 'package:shoes_store/screens/cart/checkoutScreen.dart';
@@ -17,7 +16,6 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   bool _isEditing = false;
-  List<Product> _allProducts = [];
 
   @override
   void initState() {
@@ -29,12 +27,8 @@ class _CartScreenState extends State<CartScreen> {
 
   Future<void> _loadData() async {
     final provider = CartProvider.of(context, listen: false);
-    final products = await ApiService.getProducts();
     if (mounted) {
-      setState(() {
-        _allProducts = products;
-      });
-      await provider.fetchCart(products);
+      await provider.fetchCart();
     }
   }
 
@@ -158,7 +152,7 @@ class _CartScreenState extends State<CartScreen> {
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(12),
                                     child: SmartImage(
-                                      url: cartItem.product.image,
+                                      url: cartItem.displayImage,
                                       width: 70,
                                       height: 70,
                                       fit: BoxFit.cover,
@@ -230,7 +224,7 @@ class _CartScreenState extends State<CartScreen> {
                                             children: [
                                               _buildQtyButton(
                                                 Icons.remove,
-                                                provider.isLoading ? null : () => provider.decrementQtn(index, _allProducts),
+                                                provider.isLoading ? null : () => provider.decrementQtn(index),
                                               ),
                                               Padding(
                                                 padding:
@@ -268,7 +262,7 @@ class _CartScreenState extends State<CartScreen> {
                                 // Delete Button
                                 if (_isEditing)
                                   IconButton(
-                                    onPressed: () => provider.removeAt(index, _allProducts),
+                                    onPressed: () => provider.removeAt(index),
                                     icon: const Icon(
                                       Icons.delete_outline,
                                       color: Colors.red,
@@ -376,8 +370,8 @@ class _CartScreenState extends State<CartScreen> {
     if (cartItem.id == null || newSku.id == cartItem.sku.id) return;
     try {
       // Hapus item lama, tambah item baru dengan SKU berbeda
-      await provider.removeAt(index, _allProducts);
-      await provider.addToCartRemote(newSku, cartItem.quantity, _allProducts);
+      await provider.removeAt(index);
+      await provider.addToCartRemote(newSku, cartItem.quantity);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -438,7 +432,7 @@ class _CartScreenState extends State<CartScreen> {
 
   void _incrementQty(int index) {
     final provider = CartProvider.of(context, listen: false);
-    provider.incrementQtn(index, _allProducts).catchError((e) {
+    provider.incrementQtn(index).catchError((e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:shoes_store/models/cartItem.dart';
 import 'package:shoes_store/models/productModel.dart';
 import 'package:shoes_store/services/apiService.dart';
+import 'package:shoes_store/services/productService.dart';
 
 class CartProvider extends ChangeNotifier {
   List<CartItem> _cart = [];
+  List<Product> _allProducts = [];
   bool _isLoading = false;
   String? _error;
 
@@ -21,10 +23,16 @@ class CartProvider extends ChangeNotifier {
   }
 
   // Remote Sync: Ambil data keranjang dari server
-  Future<void> fetchCart(List<Product> allProducts) async {
+  Future<void> fetchCart([List<Product>? products]) async {
     _setLoading(true);
     _error = null;
     try {
+      if (products != null && products.isNotEmpty) {
+        _allProducts = products;
+      } else if (_allProducts.isEmpty) {
+        _allProducts = await ProductService.getProducts();
+      }
+
       final remoteCart = await ApiService.getCart();
       if (remoteCart.containsKey('items')) {
         List items = remoteCart['items'];
@@ -32,7 +40,7 @@ class CartProvider extends ChangeNotifier {
           final skuId = item['sku_id'];
           Product? product;
           ProductSku? sku;
-          for (var p in allProducts) {
+          for (var p in _allProducts) {
             final foundSku = p.skus.firstWhere(
               (s) => s.id == skuId,
               orElse: () => ProductSku(id: -1, variantName: '', price: 0, stockAvailable: 0),
@@ -64,11 +72,11 @@ class CartProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> addToCartRemote(ProductSku sku, int qty, List<Product> allProducts, {Color? color}) async {
+  Future<void> addToCartRemote(ProductSku sku, int qty, {Color? color}) async {
     try {
       final colorHex = color != null ? colorToHex(color) : null;
       await ApiService.addToCart(sku.id, qty, colorHex: colorHex);
-      await fetchCart(allProducts);
+      await fetchCart();
     } catch (e) {
       rethrow;
     }
@@ -86,19 +94,19 @@ class CartProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> removeAt(int index, List<Product> allProducts) async {
+  Future<void> removeAt(int index) async {
     final item = _cart[index];
     if (item.id != null) {
       await ApiService.removeCartItem(item.id!);
     }
-    await fetchCart(allProducts);
+    await fetchCart();
   }
 
   /// Tambah 1 quantity. Gunakan endpoint add (+1) agar server validasi stok.
-  Future<void> incrementQtn(int index, List<Product> allProducts) async {
+  Future<void> incrementQtn(int index) async {
     try {
       await ApiService.addToCart(_cart[index].sku.id, 1);
-      await fetchCart(allProducts);
+      await fetchCart();
     } catch (e) {
       debugPrint("Gagal increment qty: $e");
       rethrow;
@@ -106,13 +114,13 @@ class CartProvider extends ChangeNotifier {
   }
 
   /// Kurangi 1 quantity. Pakai endpoint set-quantity agar tidak terhalang stock check.
-  Future<void> decrementQtn(int index, List<Product> allProducts) async {
+  Future<void> decrementQtn(int index) async {
     if (_cart[index].quantity <= 1) return;
     final item = _cart[index];
     if (item.id == null) return;
     try {
       await ApiService.updateCartItemQuantity(item.id!, item.quantity - 1);
-      await fetchCart(allProducts);
+      await fetchCart();
     } catch (e) {
       debugPrint("Gagal decrement qty: $e");
     }

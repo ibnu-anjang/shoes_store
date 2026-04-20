@@ -92,7 +92,7 @@ class _ReviewItemPickerSheet extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: SmartImage(
-                url: item.product.image,
+                url: item.displayImage,
                 width: 50,
                 height: 50,
                 fit: BoxFit.cover,

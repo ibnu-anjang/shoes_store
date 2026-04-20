@@ -6,6 +6,7 @@ import 'package:shoes_store/screens/detail/widget/description.dart';
 import 'package:shoes_store/screens/detail/widget/detailAppBar.dart';
 import 'package:shoes_store/screens/detail/widget/imageSlider.dart';
 import 'package:shoes_store/screens/detail/widget/itemDetails.dart';
+import 'package:shoes_store/services/productService.dart';
 
 class DetailScreen extends StatefulWidget {
   final Product product;
@@ -19,11 +20,83 @@ class _DetailScreenState extends State<DetailScreen> {
   int currentImage = 0;
   int currentColor = 0;
   int? currentSizeIndex; // null means no selection yet
+  late Product _currentProduct;
+  bool _isLoading = false;
+  final PageController _pageController = PageController();
+  late List<String> currentGallery;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(DetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Jika produk berubah (misal refresh), bangun ulang gallery
+    if (oldWidget.product.id != widget.product.id) {
+       _currentProduct = widget.product;
+       _rebuildGallery();
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _currentProduct = widget.product;
+    _rebuildGallery();
+    _checkAndFetchFullProduct();
+  }
+
+  void _rebuildGallery([Color? selectedColor]) {
+    final c = selectedColor ?? (_currentProduct.colors.isNotEmpty ? _currentProduct.colors[currentColor] : null);
+    
+    List<String> newGallery = [];
+    
+    if (c != null && _currentProduct.colorGalleries.containsKey(c)) {
+      newGallery.addAll(_currentProduct.colorGalleries[c]!);
+    }
+    
+    newGallery.addAll(_currentProduct.generalGallery);
+    
+    if (newGallery.isEmpty) {
+      newGallery = List.from(_currentProduct.gallery); 
+    }
+    
+    currentGallery = newGallery;
+    currentImage = 0;
+    if (_pageController.hasClients) {
+       _pageController.jumpToPage(0);
+    }
+  }
+
+  Future<void> _checkAndFetchFullProduct() async {
+    if (_currentProduct.colors.isEmpty) {
+      if (mounted) setState(() => _isLoading = true);
+      try {
+        final products = await ProductService.getProducts();
+        final realProduct = products.firstWhere(
+            (p) => p.id == _currentProduct.id,
+            orElse: () => _currentProduct);
+        if (mounted) {
+          setState(() {
+            _currentProduct = realProduct;
+            _rebuildGallery();
+          });
+        }
+      } catch (e) {
+        debugPrint("Error fetching full product: $e");
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    }
+  }
 
   List<ProductSku> get filteredSkus {
-    if (widget.product.colors.isEmpty) return widget.product.skus;
-    final selectedColorHex = colorToHex(widget.product.colors[currentColor]);
-    return widget.product.skus.where((sku) {
+    if (_currentProduct.colors.isEmpty) return _currentProduct.skus;
+    final selectedColorHex = colorToHex(_currentProduct.colors[currentColor]);
+    return _currentProduct.skus.where((sku) {
       return sku.colorHex == null || sku.colorHex == selectedColorHex;
     }).toList();
   }
@@ -38,14 +111,20 @@ class _DetailScreenState extends State<DetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: kcontentColor,
+        body: Center(child: CircularProgressIndicator(color: kprimaryColor)),
+      );
+    }
     return Scaffold(
       backgroundColor: kcontentColor,
       floatingActionButton: selectedSku != null 
         ? AddToCart(
-            product: widget.product,
+            product: _currentProduct,
             selectedSku: selectedSku!,
-            selectedColor: widget.product.colors.isNotEmpty
-                ? widget.product.colors[currentColor]
+            selectedColor: _currentProduct.colors.isNotEmpty
+                ? _currentProduct.colors[currentColor]
                 : Colors.black,
           )
         : null,
@@ -53,13 +132,14 @@ class _DetailScreenState extends State<DetailScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            DetailAppBar(product: widget.product),
+            DetailAppBar(product: _currentProduct),
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
                   children: [
                     MyImageSlider(
-                      images: widget.product.gallery,
+                      controller: _pageController,
+                      images: currentGallery,
                       onChange: (index) {
                         setState(() {
                           currentImage = index;
@@ -68,23 +148,26 @@ class _DetailScreenState extends State<DetailScreen> {
                     ),
 
                     const SizedBox(height: 10),
-                    // Hanya tampilkan dots jika ada lebih dari 1 gambar (dinamis)
-                    if (widget.product.gallery.length > 1) 
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(
-                        widget.product.gallery.length,
-                        (index) => AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          width: currentImage == index ? 15 : 8,
-                          height: 8,
-                          margin: const EdgeInsets.only(right: 3),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(10),
-                            color: currentImage == index
-                                ? Colors.black
-                                : Colors.transparent,
-                            border: Border.all(color: Colors.black),
+                    // Dots (Hanya tampilkan jika lebih dari 1 gambar)
+                    if (currentGallery.length > 1) 
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(
+                          currentGallery.length,
+                          (index) => AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            width: currentImage == index ? 15 : 8,
+                            height: 8,
+                            margin: const EdgeInsets.only(right: 3),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              color: currentImage == index
+                                  ? Colors.black
+                                  : Colors.transparent,
+                              border: Border.all(color: Colors.black),
+                            ),
                           ),
                         ),
                       ),
@@ -105,7 +188,7 @@ class _DetailScreenState extends State<DetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           ItemDetails(
-                            product: widget.product,
+                            product: _currentProduct,
                             selectedSku: selectedSku,
                           ),
                           const SizedBox(height: 20),
@@ -121,12 +204,13 @@ class _DetailScreenState extends State<DetailScreen> {
 
                           Row(
                             children: List.generate(
-                              widget.product.colors.length,
+                              _currentProduct.colors.length,
                               (index) => GestureDetector(
                                 onTap: () {
                                   setState(() {
                                     currentColor = index;
                                     currentSizeIndex = null; // Reset size selection on color change
+                                    _rebuildGallery(_currentProduct.colors[index]);
                                   });
                                 },
                                 child: AnimatedContainer(
@@ -136,7 +220,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                   margin: const EdgeInsets.only(right: 15),
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: widget.product.colors[index],
+                                    color: _currentProduct.colors[index],
                                     border: currentColor == index
                                         ? Border.all(
                                             color: Colors.black,
@@ -168,6 +252,7 @@ class _DetailScreenState extends State<DetailScreen> {
 
                           Wrap(
                             spacing: 10,
+                            runSpacing: 10,
                             children: List.generate(
                               filteredSkus.length,
                               (index) => GestureDetector(
@@ -212,10 +297,10 @@ class _DetailScreenState extends State<DetailScreen> {
                           const SizedBox(height: 25),
 
                            Description(
-                             productId: widget.product.id.toString(),
-                             description: widget.product.description,
-                             specification: widget.product.specification,
-                             initialRate: widget.product.rate,
+                             productId: _currentProduct.id.toString(),
+                             description: _currentProduct.description,
+                             specification: _currentProduct.specification,
+                             initialRate: _currentProduct.rate,
                            ),
                         ],
                       ),

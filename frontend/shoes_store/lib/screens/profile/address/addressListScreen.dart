@@ -25,16 +25,21 @@ class AddressListScreen extends StatelessWidget {
         title: Text(isSelectionMode ? 'Pilih Alamat' : 'Alamat Saya', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
-      body: addresses.isEmpty
-          ? _buildEmptyState(context)
-          : ListView.builder(
-              padding: const EdgeInsets.all(20),
-              itemCount: addresses.length,
-              itemBuilder: (context, index) {
-                final address = addresses[index];
-                return _buildAddressCard(context, address, addressProvider);
-              },
-            ),
+      body: RefreshIndicator(
+        onRefresh: () => addressProvider.fetchAddresses(),
+        color: kprimaryColor,
+        child: addresses.isEmpty
+            ? _buildEmptyState(context)
+            : ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(20),
+                itemCount: addresses.length,
+                itemBuilder: (context, index) {
+                  final address = addresses[index];
+                  return _buildAddressCard(context, address, addressProvider);
+                },
+              ),
+      ),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(20),
         color: Colors.white,
@@ -52,15 +57,25 @@ class AddressListScreen extends StatelessWidget {
   }
 
   Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.location_off_outlined, size: 80, color: Colors.grey.shade300),
-          const SizedBox(height: 20),
-          const Text('Belum ada alamat tersimpan', style: TextStyle(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.bold)),
-        ],
-      ),
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(
+          height: MediaQuery.of(context).size.height * 0.6,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.location_off_outlined, size: 80, color: Colors.grey.shade300),
+              const SizedBox(height: 20),
+              const Text('Belum ada alamat tersimpan',
+                  style: TextStyle(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text('Tarik ke bawah untuk refresh',
+                  style: TextStyle(fontSize: 12, color: Colors.grey)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

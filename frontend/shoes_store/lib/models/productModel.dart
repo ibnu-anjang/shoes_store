@@ -41,6 +41,8 @@ class Product {
   final List<String> sizes; // Deprecated: use skus instead for real logic
   final List<ProductSku> skus;
   final List<String> gallery; // Gallery image URLs
+  final List<String> generalGallery; // Images available for all colors
+  final Map<Color, List<String>> colorGalleries; // Images restricted to specific colors
   final String category;
   final double rate;
   int quantity;
@@ -57,6 +59,8 @@ class Product {
     required this.sizes,
     required this.skus,
     required this.gallery,
+    this.generalGallery = const [],
+    this.colorGalleries = const {},
     required this.type,
     required this.category,
     required this.rate,
@@ -71,6 +75,30 @@ class Product {
     return '$kBaseUrl/$url';
   }
 
+  String getEffectiveThumbnail(Color? color) {
+    if (color == null) return image;
+    
+    // Look for color in colorGalleries
+    // Because Color objects can be different instances with same value, 
+    // we should find by hex match if direct key lookup fails.
+    if (colorGalleries.containsKey(color)) {
+      final list = colorGalleries[color]!;
+      if (list.isNotEmpty) return list.first;
+    }
+    
+    // Fallback: search by value match
+    final matchedKey = colorGalleries.keys.firstWhere(
+      (k) => k.value == color.value,
+      orElse: () => Colors.transparent,
+    );
+    if (matchedKey != Colors.transparent) {
+      final list = colorGalleries[matchedKey]!;
+      if (list.isNotEmpty) return list.first;
+    }
+
+    return image;
+  }
+
   factory Product.fromJson(Map<String, dynamic> json) {
     var skusList = (json['skus'] as List?)?.map((i) => ProductSku.fromJson(i)).toList() ?? [];
     
@@ -80,7 +108,8 @@ class Product {
       for (var c in json['colors']) {
         final hex = c['color_hex'];
         if (hex != null) {
-          colorList.add(hexToColor(hex));
+          Color cParsed = hexToColor(hex);
+          colorList.add(cParsed);
         }
       }
     }
@@ -88,20 +117,36 @@ class Product {
     
     // Parse gallery
     List<String> galleryList = [];
+    List<String> generalGalleryList = [];
+    Map<Color, List<String>> parsedColorGalleries = {};
+
     if (json['gallery'] != null) {
       for (var img in json['gallery']) {
         final url = img['image_url'];
+        final colorHex = img['color_hex'];
+        
         if (url != null) {
-          galleryList.add(_normalizeImageUrl(url));
+          final normalized = _normalizeImageUrl(url);
+          galleryList.add(normalized);
+          
+          if (colorHex == null || colorHex.toString().isEmpty) {
+            generalGalleryList.add(normalized);
+          } else {
+            Color c = hexToColor(colorHex);
+            if (!parsedColorGalleries.containsKey(c)) {
+               parsedColorGalleries[c] = [];
+            }
+            parsedColorGalleries[c]!.add(normalized);
+          }
         }
       }
     }
     // Tambahkan main image ke depan gallery jika belum ada
+    if (json['image'] != null && !generalGalleryList.contains(_normalizeImageUrl(json['image']))) {
+      generalGalleryList.insert(0, _normalizeImageUrl(json['image']));
+    }
     if (json['image'] != null && !galleryList.contains(_normalizeImageUrl(json['image']))) {
       galleryList.insert(0, _normalizeImageUrl(json['image']));
-    }
-    if (galleryList.isEmpty && json['image'] != null) {
-       galleryList.add(_normalizeImageUrl(json['image']));
     }
 
     return Product(
@@ -113,10 +158,12 @@ class Product {
       review: "0 Reviews", 
       type: json['category'] ?? "Sneakers",          
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
-      colors: colorList,    
+      colors: colorList,
       sizes: skusList.map((s) => s.variantName).toList(), 
       skus: skusList,
       gallery: galleryList,
+      generalGallery: generalGalleryList,
+      colorGalleries: parsedColorGalleries,
       category: json['category'] ?? "Shoes",        
       rate: (json['rating'] as num?)?.toDouble() ?? 0.0,                 
       quantity: 1,

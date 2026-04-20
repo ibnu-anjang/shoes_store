@@ -27,6 +27,7 @@ class ProductColor(Base):
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id"))
     color_hex = Column(String(50), nullable=False) # e.g. "0xFF000000"
+    image_url = Column(String(255), nullable=True) # Image for this specific color
     
     product = relationship("Product", back_populates="colors")
 
@@ -35,6 +36,7 @@ class ProductImage(Base):
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id"))
     image_url = Column(String(255), nullable=False)
+    color_hex = Column(String(50), nullable=True)
     
     product = relationship("Product", back_populates="gallery")
 
@@ -101,6 +103,7 @@ class Order(Base):
     
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
     payment = relationship("PaymentConfirmation", back_populates="order", uselist=False, cascade="all, delete-orphan")
+    user = relationship("User")
 
 class OrderItem(Base):
     __tablename__ = "order_items"

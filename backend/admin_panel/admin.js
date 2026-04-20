@@ -1,4 +1,10 @@
         const API = window.location.origin;
+        function fixImageUrl(url) {
+            if (!url) return '';
+            if (url.startsWith('http')) return url;
+            const path = url.startsWith('/') ? url : '/' + url;
+            return (API + path).replace(/([^:])\/\//g, '$1/');
+        }
 
         // ── State ────────────────────────────────────────────────────
         let allOrders = [];
@@ -83,7 +89,7 @@
             else if (tab === 'products') fetchProducts();
             else if (tab === 'users') fetchUsers();
             else if (tab === 'financial') renderFinancial();
-            else if (tab === 'settings') fetchPaymentConfig();
+            else if (tab === 'settings') { fetchPaymentConfig(); fetchAdminPromos(); }
         }
 
         function renderFinancial() {
@@ -138,6 +144,13 @@
         }
         function fmtDate(d) {
             return new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
+
+        // Helper: Convert 0xFFRRGGBB to #RRGGBB for CSS
+        function formatHex(hex) {
+            if (!hex) return '';
+            if (hex.startsWith('0xFF')) return '#' + hex.substring(4);
+            return hex;
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -275,36 +288,40 @@
                 const pmBadge = { TF: 'bg-blue-900/60 text-blue-300', QRIS: 'bg-purple-900/60 text-purple-300', COD: 'bg-green-900/60 text-green-300' }[o.payment_method] || 'bg-gray-800 text-gray-400';
                 const pmLabel = o.payment_method || '—';
 
-                let actions = '';
+                let actions = '<div class="flex flex-wrap justify-center gap-1.5">';
                 if (o.status === 'VERIFYING') {
-                    actions = `
-                <button onclick="doUpdateStatus('${o.id}','PAID')" class="bg-green-700/50 hover:bg-green-600 text-green-300 px-2.5 py-1 rounded-lg text-xs font-bold mr-1">✓ Setujui</button>
-                <button onclick="doUpdateStatus('${o.id}','REJECTED')" class="bg-red-900/50 hover:bg-red-700 text-red-400 px-2.5 py-1 rounded-lg text-xs font-bold mr-1">✕ Tolak</button>`;
+                    actions += `
+                <button onclick="doUpdateStatus('${o.id}','PAID')" class="bg-green-700/50 hover:bg-green-600 text-green-300 px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1">✓ Setujui</button>
+                <button onclick="doUpdateStatus('${o.id}','REJECTED')" class="bg-red-900/50 hover:bg-red-700 text-red-400 px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1">✕ Tolak</button>`;
                 } else if (o.status === 'PAID') {
-                    actions = `<button onclick="doShip('${o.id}')" class="bg-blue-700/50 hover:bg-blue-600 text-blue-300 px-2.5 py-1 rounded-lg text-xs font-bold mr-1">📦 Kirim</button>`;
+                    actions += `<button onclick="doShip('${o.id}')" class="bg-blue-700/50 hover:bg-blue-600 text-blue-300 px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1">📦 Kirim</button>`;
                 } else if (o.status === 'SHIPPED') {
-                    actions = `<button onclick="doUpdateStatus('${o.id}','DELIVERED')" class="bg-purple-700/50 hover:bg-purple-600 text-purple-300 px-2.5 py-1 rounded-lg text-xs font-bold mr-1">✅ Selesai</button>`;
+                    actions += `<button onclick="doUpdateStatus('${o.id}','DELIVERED')" class="bg-purple-700/50 hover:bg-purple-600 text-purple-300 px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1">✅ Selesai</button>`;
                 } else if (o.status === 'UNPAID') {
-                    actions = `
-                <button onclick="doUpdateStatus('${o.id}','PAID')" class="bg-green-700/50 hover:bg-green-600 text-green-300 px-2.5 py-1 rounded-lg text-xs font-bold mr-1">✓ Proses</button>
-                <button onclick="doUpdateStatus('${o.id}','CANCELLED')" class="bg-gray-700 hover:bg-gray-600 text-gray-400 px-2.5 py-1 rounded-lg text-xs font-bold mr-1">Batal</button>`;
+                    actions += `
+                <button onclick="doUpdateStatus('${o.id}','PAID')" class="bg-green-700/50 hover:bg-green-600 text-green-300 px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1">✓ Proses</button>
+                <button onclick="doUpdateStatus('${o.id}','CANCELLED')" class="bg-gray-700 hover:bg-gray-600 text-gray-400 px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1">Batal</button>`;
                 }
                 
-                actions += `<button onclick="doDeleteOrder('${o.id}')" class="bg-red-900/40 hover:bg-red-700 text-red-500 px-2.5 py-1 rounded-lg text-xs font-bold mt-1 block w-max">🗑 Hapus</button>`;
+                actions += `<button onclick="doDeleteOrder('${o.id}')" class="bg-red-900/40 hover:bg-red-700 text-red-500 px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1">🗑 Hapus</button></div>`;
 
 
                 // Order items for expandable detail
                 const itemsHtml = o.items && o.items.length ? o.items.map(item => `
-            <div class="flex items-center gap-3 py-1">
-                ${item.product_image ? `<img src="${item.product_image.startsWith('http') ? item.product_image : API + '/' + item.product_image}" class="w-8 h-8 rounded-lg object-cover bg-gray-800 flex-shrink-0" onerror="this.style.display='none'">` : '<div class="w-8 h-8 rounded-lg bg-gray-800 flex-shrink-0"></div>'}
+            <div class="flex items-center gap-3 py-1.5 border-b border-gray-700/30 last:border-0 border-dashed">
+                ${item.product_image ? `<img src="${fixImageUrl(item.product_image)}" class="w-10 h-10 rounded-lg object-cover bg-gray-800 flex-shrink-0" onerror="this.style.display='none'">` : '<div class="w-10 h-10 rounded-lg bg-gray-800 flex-shrink-0"></div>'}
                 <div class="flex-1 min-w-0">
-                    <p class="text-xs font-semibold text-gray-200 truncate">${item.product_name || 'Produk dihapus'}</p>
-                    <p class="text-[11px] text-gray-500">
-                        ${item.variant_name || '—'} × ${item.quantity}
-                        ${item.color_hex ? `| <span class="inline-block w-2.5 h-2.5 rounded-full border border-gray-600 align-middle ml-1" style="background-color: ${item.color_hex}"></span> ${item.color_hex}` : ''}
-                    </p>
+                    <p class="text-xs font-bold text-gray-200 truncate">${item.product_name || 'Produk dihapus'}</p>
+                    <div class="flex items-center gap-2 mt-0.5">
+                        <span class="text-[11px] text-gray-500">${item.variant_name || '—'} × ${item.quantity}</span>
+                        ${item.color_hex ? `
+                        <div class="flex items-center gap-1 bg-gray-800 px-1.5 py-0.5 rounded border border-gray-700">
+                            <span class="inline-block w-2 h-2 rounded-full border border-white/20" style="background-color: ${formatHex(item.color_hex)}"></span>
+                            <span class="text-[9px] font-mono text-gray-400 uppercase">${item.color_hex}</span>
+                        </div>` : ''}
+                    </div>
                 </div>
-                <span class="text-xs font-semibold text-orange-300 flex-shrink-0">${fmtRp(item.price_at_checkout * item.quantity)}</span>
+                <span class="text-xs font-bold text-orange-400 flex-shrink-0">${fmtRp(item.price_at_checkout * item.quantity)}</span>
             </div>`).join('') : '<p class="text-xs text-gray-600">Tidak ada item</p>';
 
                 return `
@@ -324,31 +341,74 @@
                 <td class="px-4 py-3 text-center" onclick="event.stopPropagation()">${actions}</td>
             </tr>
             <tr id="detail-${o.id}" class="detail-section">
-                <td colspan="8" class="bg-gray-800/50 border-b border-gray-800 px-8 py-4">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <p class="text-xs font-bold text-gray-400 uppercase mb-2">Item Pesanan (${o.items?.length || 0})</p>
-                            <div class="space-y-0.5">${itemsHtml}</div>
+                <td colspan="8" class="bg-gray-800/30 border-b border-gray-800 p-0">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-0 divide-x divide-gray-800">
+                        <!-- Kolom Detail Item -->
+                        <div class="p-6 col-span-1">
+                            <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
+                                Item Pesanan (${o.items?.length || 0})
+                            </p>
+                            <div class="space-y-1">${itemsHtml}</div>
                         </div>
-                        <div class="space-y-2">
-                            <div>
-                                <p class="text-xs font-bold text-gray-400 uppercase mb-1">Alamat Pengiriman</p>
-                                <p class="text-sm text-gray-300">${o.shipping_address || '—'}</p>
+
+                        <!-- Kolom Data Pelanggan -->
+                        <div class="p-6 col-span-1 bg-gray-900/20">
+                            <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                                Data Pelanggan
+                            </p>
+                            <div class="flex items-start gap-4 mb-5">
+                                <img src="${o.profile_image ? fixImageUrl(o.profile_image) : 'https://ui-avatars.com/api/?name=' + (o.username || 'U') + '&background=f97316&color=fff'}" 
+                                     class="w-12 h-12 rounded-full object-cover border-2 border-orange-500/20 p-0.5" alt="">
+                                <div>
+                                    <p class="text-sm font-bold text-white leading-none">${o.username || 'Anonymous'}</p>
+                                    <p class="text-[11px] text-gray-500 mt-1">${o.email || 'No email'}</p>
+                                    <p class="text-[10px] text-orange-400 font-mono mt-0.5 tracking-tighter">USER_ID: ${o.user_id}</p>
+                                </div>
                             </div>
-                            <div>
-                                <p class="text-xs font-bold text-gray-400 uppercase mb-1">Telepon</p>
-                                <p class="text-sm text-gray-300">${o.phone || '—'}</p>
+                            <div class="space-y-3 pt-4 border-t border-gray-800/50">
+                                <div>
+                                    <p class="text-[10px] font-bold text-gray-600 uppercase mb-1">Alamat Pengiriman</p>
+                                    <p class="text-xs text-gray-300 leading-relaxed">${o.shipping_address || '—'}</p>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-bold text-gray-600 uppercase mb-1">Telepon</p>
+                                    <p class="text-xs text-gray-300 font-mono tracking-wider">${o.phone || '—'}</p>
+                                </div>
                             </div>
-                            <div>
-                                <p class="text-xs font-bold text-gray-400 uppercase mb-1">Metode Bayar</p>
-                                <p class="text-sm text-gray-300">${o.payment_method || '—'}</p>
+                        </div>
+
+                        <!-- Kolom Info Pembayaran & Resi -->
+                        <div class="p-6 col-span-1">
+                            <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                Ringkasan Transaksi
+                            </p>
+                            <div class="space-y-4">
+                                <div class="grid grid-cols-2 gap-2 bg-gray-900/40 p-3 rounded-xl border border-gray-800">
+                                    <div>
+                                        <p class="text-[9px] font-bold text-gray-600 uppercase">Metode Bayar</p>
+                                        <p class="text-xs font-bold text-white mt-0.5">${o.payment_method || '—'}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-[9px] font-bold text-gray-600 uppercase">Kode Unik</p>
+                                        <p class="text-xs font-bold text-orange-400 mt-0.5">+Rp ${o.unique_code}</p>
+                                    </div>
+                                </div>
+                                
+                                ${o.tracking_number ? `
+                                <div class="bg-blue-900/10 p-3 rounded-xl border border-blue-500/20">
+                                    <p class="text-[9px] font-bold text-blue-400 uppercase mb-1">No. Resi Pengiriman</p>
+                                    <p class="text-xs font-bold text-blue-200 font-mono select-all">${o.tracking_number}</p>
+                                </div>` : ''}
+
+                                ${o.expired_at ? `
+                                <div class="bg-red-900/10 p-3 rounded-xl border border-red-500/20">
+                                    <p class="text-[9px] font-bold text-red-400 uppercase mb-1">Batas Waktu</p>
+                                    <p class="text-[10px] text-red-300">${fmtDate(o.expired_at)}</p>
+                                </div>` : ''}
                             </div>
-                            <div>
-                                <p class="text-xs font-bold text-gray-400 uppercase mb-1">Kode Unik</p>
-                                <p class="text-sm text-gray-300">+Rp ${o.unique_code}</p>
-                            </div>
-                            ${o.tracking_number ? `<div><p class="text-xs font-bold text-gray-400 uppercase mb-1">No. Resi</p><p class="text-sm font-semibold text-blue-300">${o.tracking_number}</p></div>` : ''}
-                            ${o.expired_at ? `<div><p class="text-xs font-bold text-gray-400 uppercase mb-1">Expired</p><p class="text-xs text-gray-500">${fmtDate(o.expired_at)}</p></div>` : ''}
                         </div>
                     </div>
                 </td>
@@ -570,7 +630,8 @@
 
         function updateVariationMatrix() {
             const colorInputs = Array.from(document.querySelectorAll('#p-color-list .color-item input[type="color"]'));
-            const colors = colorInputs.map(inp => '0xFF' + inp.value.replace('#', '').toUpperCase());
+            let colors = colorInputs.map(inp => '0xFF' + inp.value.replace('#', '').toUpperCase());
+            colors = [...new Set(colors)]; // Deduplicate identical colors
             const tbody = document.getElementById('sku-matrix-rows');
             const section = document.getElementById('matrix-section');
             const price = document.getElementById('p-price').value;
@@ -727,7 +788,7 @@
                 return;
             }
             tbody.innerHTML = products.map(p => {
-                const imgUrl = p.image ? (p.image.startsWith('http') ? p.image : `${API}/${p.image}`) : '';
+                const imgUrl = fixImageUrl(p.image);
                 const totalStock = p.skus.reduce((s, sku) => s + sku.stock_available, 0);
                 const stockColor = totalStock === 0 ? 'text-red-400' : totalStock <= 10 ? 'text-yellow-400' : 'text-green-400';
 
@@ -899,7 +960,7 @@
         async function updateStock(skuId) {
             const val = document.getElementById(`stock-${skuId}`).value;
             try {
-                const res = await fetch(`${API}/admin/skus/${skuId}/stock?stock=${val}`, { method: 'PUT', headers: getAdminHeaders() });
+                const res = await fetch(`${API}/admin/skus/${skuId}?stock=${val}`, { method: 'PUT', headers: getAdminHeaders() });
                 if (res.ok) { toast('Stok diperbarui!'); fetchProducts(); }
                 else toast('Gagal update stok', 'error');
             } catch { toast('Koneksi gagal', 'error'); }
@@ -926,67 +987,225 @@
         }
 
         // ── Photo Modal ───────────────────────────────────────────
+        let photoQueueFiles = [];
+        let existingPhotoChanges = {};   // {imageId: newRole}
+        let existingPhotoDeletions = new Set(); 
+
         function openPhotoModal(productId, productName) {
             currentPhotoProductId = productId;
             document.getElementById('photo-product-name').textContent = productName;
             document.getElementById('photo-file-input').value = '';
-            document.getElementById('photo-preview-wrap').classList.add('hidden');
-            document.getElementById('photo-submit-btn').disabled = true;
+            document.getElementById('photo-queue-container').innerHTML = '';
+            document.getElementById('photo-submit-btn').disabled = true; // Disabled until change detected
+            photoQueueFiles = [];
+            existingPhotoChanges = {};
+            existingPhotoDeletions.clear();
+
+            const p = allProducts.find(x => x.id === productId);
+            const existContainer = document.getElementById('photo-existing-container');
+            existContainer.innerHTML = '';
+
+            if (p && p.gallery && p.gallery.length > 0) {
+                const colorOptionsTemplate = (p.colors || []).map(c => 
+                    `<option value="${c.color_hex}">Spesifik Warna: ${c.color_hex.replace('0xFF', '#')}</option>`
+                ).join('');
+
+                p.gallery.forEach(img => {
+                    const row = document.createElement('div');
+                    row.className = 'flex items-center gap-3 bg-gray-800 p-2 rounded-lg border border-gray-700 fade-in';
+                    row.id = `existing-photo-row-${img.id}`;
+                    
+                    const normalizedUrl = fixImageUrl(img.image_url);
+                    const isCurrentThumb = (img.image_url === p.image);
+                    const hexValue = img.color_hex || 'gallery';
+
+                    row.innerHTML = `
+                        <div class="relative shrink-0">
+                            <img src="${normalizedUrl}" class="w-12 h-12 rounded object-cover border border-gray-600">
+                            ${isCurrentThumb ? '<span class="absolute -top-1 -left-1 bg-orange-500 text-white text-[8px] font-bold px-1 rounded border border-orange-300">THUMB</span>' : ''}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-1.5 mb-1">
+                                <p class="text-[10px] font-medium text-gray-500">ID: ${img.id}</p>
+                                ${isCurrentThumb ? '<span class="text-[9px] text-orange-400 font-bold uppercase tracking-wider">Thumbnail Aktif</span>' : ''}
+                            </div>
+                            <select onchange="updateExistingPhotoRole(${img.id}, this.value)" class="bg-gray-700 border border-gray-600 text-xs rounded px-2 py-1 text-white w-full outline-none focus:border-orange-500">
+                                <option value="gallery" ${hexValue === 'gallery' && !isCurrentThumb ? 'selected' : ''}>Galeri Umum (Bawaan)</option>
+                                <option value="thumbnail" ${isCurrentThumb ? 'selected' : ''}>Jadikan Thumbnail Utama</option>
+                                ${ (p.colors || []).map(c => 
+                                    `<option value="${c.color_hex}" ${hexValue === c.color_hex && !isCurrentThumb ? 'selected' : ''}>Spesifik Warna: ${c.color_hex.replace('0xFF', '#')}</option>`
+                                ).join('') }
+                            </select>
+                        </div>
+                        <button type="button" onclick="deleteExistingPhoto(${img.id}, this)" class="text-red-400 hover:bg-red-500/20 p-1.5 rounded transition" title="Hapus Foto">
+                           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    `;
+                    existContainer.appendChild(row);
+                });
+            }
+
             const m = document.getElementById('photo-modal');
             m.classList.remove('hidden'); m.classList.add('flex');
         }
+
+        function deleteExistingPhoto(imageId, btnElement) {
+            existingPhotoDeletions.add(imageId);
+            document.getElementById(`existing-photo-row-${imageId}`).classList.add('opacity-30', 'grayscale', 'pointer-events-none');
+            document.getElementById('photo-submit-btn').disabled = false;
+        }
+
+        function updateExistingPhotoRole(imageId, newRole) {
+            existingPhotoChanges[imageId] = newRole;
+            document.getElementById('photo-submit-btn').disabled = false;
+        }
+
         function closePhotoModal() {
             document.getElementById('photo-modal').classList.replace('flex', 'hidden');
             currentPhotoProductId = null;
         }
-        function previewPhoto(input) {
-            const files = input.files;
-            const wrap = document.getElementById('photo-preview-wrap');
-            wrap.innerHTML = '';
-            if (!files.length) { wrap.classList.add('hidden'); return; }
+        function previewPhotoQueue(input) {
+            const files = Array.from(input.files);
+            if (!files.length) return;
+            
+            const p = allProducts.find(x => x.id === currentPhotoProductId);
+            const colorOptions = (p.colors || []).map(c => `<option value="${c.color_hex}">Spesifik Warna: ${c.color_hex.replace('0xFF', '#')}</option>`).join('');
 
-            wrap.classList.remove('hidden');
-            document.getElementById('photo-submit-btn').disabled = false;
+            const container = document.getElementById('photo-queue-container');
+            
+            files.forEach((file, idx) => {
+                const uniqueId = Date.now() + '-' + Math.random();
+                photoQueueFiles.push({ id: uniqueId, file: file });
 
-            Array.from(files).forEach(file => {
                 const reader = new FileReader();
                 reader.onload = e => {
-                    const img = document.createElement('img');
-                    img.src = e.target.result;
-                    img.className = 'w-20 h-20 rounded-lg object-cover border border-gray-700';
-                    wrap.appendChild(img);
+                    const row = document.createElement('div');
+                    row.className = 'flex items-center gap-3 bg-gray-800 p-2 rounded-lg border border-gray-700';
+                    row.dataset.qid = uniqueId;
+                    row.innerHTML = `
+                        <img src="${e.target.result}" class="w-12 h-12 rounded object-cover border border-gray-600 shrink-0">
+                        <div class="flex-1 min-w-0">
+                            <p class="text-[11px] truncate font-medium text-gray-300 mb-1">${file.name}</p>
+                            <select class="photo-role-select bg-gray-700 border border-gray-600 text-xs rounded px-2 py-1 text-white w-full outline-none focus:border-orange-500">
+                                <option value="gallery">Galeri Umum (Bawaan)</option>
+                                <option value="thumbnail">Jadikan Thumbnail Utama</option>
+                                ${colorOptions}
+                            </select>
+                        </div>
+                        <button type="button" onclick="removeQueueRow('${uniqueId}', this)" class="text-red-400 hover:bg-red-500/20 p-1.5 rounded transition">
+                           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    `;
+                    container.appendChild(row);
                 };
                 reader.readAsDataURL(file);
             });
+            input.value = '';
+            document.getElementById('photo-submit-btn').disabled = false;
         }
-        async function submitPhoto() {
-            const files = document.getElementById('photo-file-input').files;
-            if (!files.length || !currentPhotoProductId) return;
+        function removeQueueRow(uid, btn) {
+            photoQueueFiles = photoQueueFiles.filter(x => x.id !== uid);
+            btn.closest('div[data-qid]').remove();
+        }
+
+        async function submitPhotoQueue() {
+            if (!currentPhotoProductId) return;
+            const hasNew = (photoQueueFiles.length > 0);
+            const hasExistChanges = (Object.keys(existingPhotoChanges).length > 0);
+            const hasDeletions = (existingPhotoDeletions.size > 0);
+
+            if (!hasNew && !hasExistChanges && !hasDeletions) {
+                toast('Tidak ada perubahan untuk disimpan', 'warn');
+                return;
+            }
+
             const btn = document.getElementById('photo-submit-btn');
-            btn.disabled = true; btn.textContent = 'Mengupload...';
+            btn.disabled = true; btn.textContent = 'Sedang Menyimpan...';
 
-            // Upload thumbnail (first image) and gallery (all images)
             try {
-                const fd = new FormData();
-                fd.append('file', files[0]);
-                // Update main image
-                const mainRes = await fetch(`${API}/admin/products/${currentPhotoProductId}/image`, {
-                    method: 'POST', headers: getAdminHeaders(), body: fd
-                });
-
-                // If multiple, upload to gallery too
-                if (files.length > 1) {
-                    const fdG = new FormData();
-                    for (let i = 0; i < files.length; i++) fdG.append('files', files[i]);
-                    await fetch(`${API}/admin/products/${currentPhotoProductId}/gallery`, {
-                        method: 'POST', headers: getAdminHeaders(), body: fdG
-                    });
+                // 1. Process Deletions
+                if (hasDeletions) {
+                    for (const imgId of existingPhotoDeletions) {
+                        await fetch(`${API}/admin/products/${currentPhotoProductId}/gallery/${imgId}`, {
+                            method: 'DELETE', headers: getAdminHeaders()
+                        });
+                    }
                 }
 
-                toast('Foto berhasil diupdate & galeri ditambahkan!');
-                closePhotoModal(); fetchProducts();
-            } catch (e) { toast('Error upload: ' + e.message, 'error'); }
-            finally { btn.disabled = false; btn.textContent = 'Upload Foto'; }
+                // 2. Process Existing metadata changes (Role/Thumbnail)
+                if (hasExistChanges) {
+                    for (const [imgId, role] of Object.entries(existingPhotoChanges)) {
+                        // Skip if image was marked for deletion
+                        if (existingPhotoDeletions.has(parseInt(imgId))) continue;
+
+                        if (role === 'thumbnail') {
+                            await fetch(`${API}/admin/products/${currentPhotoProductId}/thumbnail/${imgId}`, {
+                                method: 'PATCH', headers: getAdminHeaders()
+                            });
+                        } else {
+                            await fetch(`${API}/admin/products/${currentPhotoProductId}/gallery/${imgId}`, {
+                                method: 'PUT',
+                                headers: getHeaders(),
+                                body: JSON.stringify({ color_hex: role === 'gallery' ? null : role })
+                            });
+                        }
+                    }
+                }
+
+                // 3. Process New Uploads (Original Logic)
+                if (hasNew) {
+                    const container = document.getElementById('photo-queue-container');
+                    const selects = container.querySelectorAll('.photo-role-select');
+                    
+                    let thumbFile = null;
+                    const galleryFiles = [];
+
+                    selects.forEach((sel, i) => {
+                        const role = sel.value;
+                        const f = photoQueueFiles[i].file;
+                        if (role === 'thumbnail' && !thumbFile) {
+                            thumbFile = f;
+                        } else if (role === 'gallery' || role === 'thumbnail') {
+                            galleryFiles.push({ file: f, color_hex: null });
+                        } else {
+                            galleryFiles.push({ file: f, color_hex: role });
+                        }
+                    });
+
+                    if (thumbFile) {
+                        const fd = new FormData();
+                        fd.append('file', thumbFile);
+                        await fetch(`${API}/admin/products/${currentPhotoProductId}/image`, {
+                            method: 'POST', headers: getAdminHeaders(), body: fd
+                        });
+                    }
+                    
+                    const groups = {};
+                    galleryFiles.forEach(item => {
+                        const k = item.color_hex || 'null';
+                        if (!groups[k]) groups[k] = [];
+                        groups[k].push(item.file);
+                    });
+
+                    for (const k of Object.keys(groups)) {
+                        const fdG = new FormData();
+                        groups[k].forEach(f => fdG.append('files', f));
+                        if (k !== 'null') fdG.append('color_hex', k);
+                        
+                        await fetch(`${API}/admin/products/${currentPhotoProductId}/gallery`, {
+                            method: 'POST', headers: getAdminHeaders(), body: fdG
+                        });
+                    }
+                }
+
+                toast('Semua perubahan galeri berhasil disimpan!');
+                closePhotoModal(); 
+                fetchProducts();
+            } catch (e) { 
+                toast('Gagal menyimpan: ' + e.message, 'error'); 
+            } finally { 
+                btn.disabled = false; btn.textContent = 'Simpan Perubahan'; 
+            }
         }
 
         // ── Edit Product Modal ────────────────────────────────────
@@ -1028,16 +1247,83 @@
             const div = document.createElement('div');
             div.className = 'color-item relative fade-in';
             const hexVal = hex.startsWith('0xFF') ? '#' + hex.replace('0xFF', '') : hex;
+            const hexApi = '0xFF' + hexVal.replace('#', '').toUpperCase();
+            
             div.innerHTML = `
-                <input type="color" value="${hexVal}"
+                <input type="color" value="${hexVal}" data-prev="${hexApi}"
                     class="w-12 h-12 rounded-xl cursor-pointer border-2 border-gray-600 hover:border-orange-500 transition-all p-0.5 bg-transparent"
-                    onchange="updateSkuColorDropdownsEdit()">
+                    onchange="handleColorChangeEdit(this)">
                 <button type="button"
-                    onclick="this.parentElement.remove(); updateSkuColorDropdownsEdit();"
+                    onclick="removeColorInputEdit(this, '${hexVal}')"
                     class="absolute -top-2 -right-2 w-5 h-5 bg-red-600 hover:bg-red-500 rounded-full text-white text-[10px] font-bold flex items-center justify-center shadow-lg border border-red-800 transition-colors">✕</button>
             `;
             list.appendChild(div);
             updateSkuColorDropdownsEdit();
+        }
+
+        function handleColorChangeEdit(inp) {
+            const oldHex = inp.getAttribute('data-prev');
+            const newHexRaw = inp.value;
+            const newHex = '0xFF' + newHexRaw.replace('#', '').toUpperCase();
+            
+            // 1. Update SKUs local data
+            if (editingProductData && editingProductData.skus) {
+                editingProductData.skus.forEach(s => {
+                    if (s.color_hex === oldHex) s.color_hex = newHex;
+                });
+            }
+            
+            // 2. Update Product Colors local data
+            if (editingProductData && editingProductData.colors) {
+                const cIdx = editingProductData.colors.findIndex(c => c.color_hex === oldHex);
+                if (cIdx !== -1) editingProductData.colors[cIdx].color_hex = newHex;
+                else editingProductData.colors.push({ color_hex: newHex });
+            }
+
+            // 3. Update Gallery local data (Automatic migration)
+            if (editingProductData && editingProductData.gallery) {
+                editingProductData.gallery.forEach(img => {
+                    if (img.color_hex === oldHex) img.color_hex = newHex;
+                });
+            }
+
+            // 4. Update data-prev for next change
+            inp.setAttribute('data-prev', newHex);
+
+            // 4. Update UI
+            updateSkuColorDropdownsEdit();
+            renderEditSkuList(editingProductData.skus);
+            toast('Warna diperbarui secara lokal. Simpan varian untuk menerapkan ke database.', 'info');
+        }
+
+        function removeColorInputEdit(btnElement, hexVal) {
+            const hexApi = '0xFF' + hexVal.replace('#', '').toUpperCase();
+            const skusToDel = editingProductData.skus.filter(s => s.color_hex === hexApi);
+            if (skusToDel.length > 0) {
+                confirm2('Hapus Warna', `Hapus warna ini dan ${skusToDel.length} ukurannya?`, async () => {
+                    let failed = 0;
+                    for (const s of skusToDel) {
+                        try {
+                            const res = await fetch(`${API}/admin/skus/${s.id}`, { method: 'DELETE', headers: getAdminHeaders() });
+                            if (!res.ok) failed++;
+                        } catch { failed++; }
+                    }
+                    if (failed) toast(`Gagal hapus ${failed} varian`, 'warn');
+                    else toast('Warna dan ukurannya dihapus');
+                    
+                    btnElement.parentElement.remove();
+                    updateSkuColorDropdownsEdit();
+                    await fetchProducts();
+                    const p = allProducts.find(x => x.id === currentEditProductId);
+                    if (p) {
+                        editingProductData = p; // Synchronize local data
+                        renderEditSkuList(p.skus);
+                    }
+                });
+            } else {
+                btnElement.parentElement.remove();
+                updateSkuColorDropdownsEdit();
+            }
         }
 
         function updateSkuColorDropdownsEdit() {
@@ -1141,7 +1427,16 @@
 
             try {
                 const res = await fetch(`${API}/admin/skus/${skuId}?${params.toString()}`, { method: 'PUT', headers: getAdminHeaders() });
-                if (res.ok) { toast('Detail varian diperbarui!'); fetchProducts(); }
+                if (res.ok) { 
+                    toast('Detail varian diperbarui!'); 
+                    await fetchProducts(); 
+                    // Update local editingProductData and re-render
+                    const p = allProducts.find(x => x.id === currentEditProductId);
+                    if (p) {
+                        editingProductData = p;
+                        renderEditSkuList(p.skus);
+                    }
+                }
                 else toast('Gagal update', 'error');
             } catch { toast('Koneksi gagal', 'error'); }
         }
@@ -1206,13 +1501,36 @@
             const colors = Array.from(document.querySelectorAll('#edit-color-list .color-item input[type="color"]'))
                 .map(inp => ({ color_hex: '0xFF' + inp.value.replace('#', '').toUpperCase() }));
 
+            // Collect SKUs (Variations) from the table
+            const skus = [];
+            document.querySelectorAll('#edit-sku-list tr.group').forEach(row => {
+                const id = row.querySelector('button[onclick*="updateSkuFromEdit"]').getAttribute('onclick').match(/\d+/)[0];
+                const vName = row.querySelector('span.font-bold.text-gray-200').textContent.trim();
+                const vColor = row.querySelector(`input[id="edit-color-${id}"]`).value;
+                const vPrice = parseFloat(row.querySelector(`input[id="edit-price-${id}"]`).value);
+                const vStock = parseInt(row.querySelector(`input[id="edit-stock-${id}"]`).value);
+                
+                skus.push({ 
+                    id: parseInt(id),
+                    variant_name: vName,
+                    color_hex: vColor !== 'null' ? vColor : null,
+                    price: vPrice,
+                    stock_available: vStock
+                });
+            });
+
             const payload = {
                 name: document.getElementById('edit-name').value.trim(),
                 price: parsePrice(document.getElementById('edit-price').value),
                 description: document.getElementById('edit-description').value.trim(),
                 specification: document.getElementById('edit-specification').value.trim(),
                 category,
-                colors
+                colors,
+                skus,
+                gallery: editingProductData.gallery ? editingProductData.gallery.map(img => ({
+                    id: img.id,
+                    color_hex: img.color_hex
+                })) : []
             };
             if (!payload.name || !payload.price) { toast('Nama dan harga wajib diisi', 'warn'); return; }
             try {
@@ -1366,3 +1684,155 @@
         populateCategorySelects();
         initSkuRows();
         switchTab('dashboard');
+
+        // ── Promo Management (Banners) ─────────────────────────────
+        async function fetchAdminPromos() {
+            try {
+                const r = await fetch(API + '/promos');
+                const data = await r.json();
+                
+                // Reset select all checkbox
+                const selectAll = document.getElementById('promo-select-all');
+                if (selectAll) selectAll.checked = false;
+                
+                renderAdminPromos(data);
+                updatePromoSelectedCount();
+            } catch (e) {
+                console.error("fetchPromos error", e);
+                document.getElementById('promo-list').innerHTML = `<p class="col-span-full py-4 text-center text-red-400 text-xs italic">Gagal memuat banner</p>`;
+            }
+        }
+
+        function renderAdminPromos(promos) {
+            const list = document.getElementById('promo-list');
+            if (promos.length === 0) {
+                list.innerHTML = `<div class="col-span-full py-10 text-center"><p class="text-gray-500 text-xs italic">Belum ada banner aktif</p></div>`;
+                return;
+            }
+
+            list.innerHTML = promos.map(p => `
+                <div class="relative group bg-gray-800 rounded-lg overflow-hidden border border-gray-700 shadow-sm aspect-video">
+                    <img src="${fixImageUrl(p.image_url)}" class="w-full h-full object-cover">
+                    
+                    <!-- Selection Checkbox -->
+                    <div class="absolute top-2 left-2 z-20">
+                        <input type="checkbox" data-promo-id="${p.id}" onchange="updatePromoSelectedCount()" 
+                               class="promo-checkbox w-5 h-5 rounded-md bg-black/40 border-white/20 text-orange-500 focus:ring-orange-500/20 cursor-pointer backdrop-blur-sm transition-all hover:scale-110">
+                    </div>
+
+                    <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
+                        <button onclick="deletePromo(${p.id})" class="w-8 h-8 rounded-full bg-red-500/80 hover:bg-red-500 text-white flex items-center justify-center transition">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleSelectAllPromos(inp) {
+            const checkboxes = document.querySelectorAll('.promo-checkbox');
+            checkboxes.forEach(cb => cb.checked = inp.checked);
+            updatePromoSelectedCount();
+        }
+
+        function updatePromoSelectedCount() {
+            const checkboxes = document.querySelectorAll('.promo-checkbox');
+            const selected = Array.from(checkboxes).filter(cb => cb.checked);
+            const countEl = document.getElementById('promo-selected-count');
+            const actionsBar = document.getElementById('promo-bulk-actions');
+            
+            if (countEl) countEl.textContent = selected.length;
+            if (actionsBar) {
+                if (checkboxes.length > 0) actionsBar.classList.remove('hidden');
+                else actionsBar.classList.add('hidden');
+            }
+            
+            // Sync the master checkbox
+            const master = document.getElementById('promo-select-all');
+            if (master && checkboxes.length > 0) {
+                master.checked = (selected.length === checkboxes.length);
+            }
+        }
+
+        async function deleteSelectedPromos() {
+            const selected = Array.from(document.querySelectorAll('.promo-checkbox:checked')).map(cb => cb.dataset.promoId);
+            if (selected.length === 0) return;
+
+            confirm2('Hapus Banner Terpilih?', `${selected.length} banner akan dihapus dari slider home secara permanen.`, async () => {
+                try {
+                    toast(`Sedang menghapus ${selected.length} banner...`, 'info');
+                    let successCount = 0;
+                    
+                    for (const id of selected) {
+                        try {
+                            const r = await fetch(API + '/admin/promos/' + id, {
+                                method: 'DELETE',
+                                headers: getAdminHeaders()
+                            });
+                            if (r.ok) successCount++;
+                        } catch (e) {
+                            console.error(`Error deleting promo ${id}`, e);
+                        }
+                    }
+
+                    if (successCount > 0) {
+                        toast(`${successCount} banner berhasil dihapus`);
+                        fetchAdminPromos();
+                    } else {
+                        toast('Gagal menghapus banner', 'error');
+                    }
+                } catch (e) {
+                    toast('Terjadi kesalahan saat menghapus', 'error');
+                }
+            });
+        }
+
+        async function uploadPromo(inp) {
+            if (!inp.files || inp.files.length === 0) return;
+            const files = Array.from(inp.files);
+            const fd = new FormData();
+            files.forEach(f => fd.append('files', f));
+
+            try {
+                toast(`Sedang mengupload ${files.length} banner...`, 'info');
+                const r = await fetch(API + '/admin/promos', {
+                    method: 'POST',
+                    headers: getAdminHeaders(),
+                    body: fd
+                });
+                if (r.ok) {
+                    toast(`${files.length} Banner berhasil ditambahkan`);
+                    fetchAdminPromos();
+                } else {
+                    const data = await r.json();
+                    toast(data.detail || 'Gagal tambah banner', 'error');
+                }
+            } catch (e) {
+                toast('Gagal upload banner', 'error');
+            } finally {
+                inp.value = '';
+            }
+        }
+
+
+        function deletePromo(id) {
+            confirm2('Hapus Banner?', 'Gambar ini akan dihapus dari slider home.', async () => {
+                try {
+                    const r = await fetch(API + '/admin/promos/' + id, {
+                        method: 'DELETE',
+                        headers: getAdminHeaders()
+                    });
+                    if (r.ok) {
+                        toast('Banner dihapus');
+                        fetchAdminPromos();
+                    } else {
+                        const data = await r.json();
+                        toast(data.detail || 'Gagal hapus banner', 'error');
+                    }
+                } catch (e) {
+                    toast('Gagal menghapus banner', 'error');
+                }
+            });
+        }

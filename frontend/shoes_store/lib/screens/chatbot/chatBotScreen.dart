@@ -12,8 +12,23 @@ class AssistantChatScreen extends StatefulWidget {
 
 class _AssistantChatScreenState extends State<AssistantChatScreen> {
   final TextEditingController controller = TextEditingController();
-  final List<Map<String, String>> messages = [];
+  final ScrollController scrollController = ScrollController();
+  final List<Map<String, String>> messages = [
+    {"role": "bot", "text": "Yoo! Gua SoleMate. Ada yang bisa gua bantu soal nyari sepatu idaman lo?"}
+  ];
   bool isLoading = false;
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (scrollController.hasClients) {
+        scrollController.animateTo(
+          scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
 
   Future<void> sendMessage() async {
     if (controller.text.trim().isEmpty) return;
@@ -27,14 +42,14 @@ class _AssistantChatScreenState extends State<AssistantChatScreen> {
       isLoading = true;
     });
     controller.clear();
+    _scrollToBottom();
 
     try {
-      // Alur Operasi Bungkam: Panggil backend simulasi cerdas
       final response = await http.post(
-        Uri.parse("${AuthService.baseUrl}/chat"), // Menggunakan Saklar Global
+        Uri.parse("${AuthService.baseUrl}/chat"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"message": userMessage}),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 60));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -44,19 +59,29 @@ class _AssistantChatScreenState extends State<AssistantChatScreen> {
             "text": data["reply"],
           });
         });
+        _scrollToBottom();
       }
     } catch (e) {
       setState(() {
         messages.add({
           "role": "bot",
-          "text": "Maaf, asisten sedang sibuk atau koneksi lambat. Coba lagi nanti ya!",
+          "text": "Sori bro, koneksi lagi bapuk atau gua lagi mikir kepanjangan nih. Coba ketik lagi ya!",
         });
       });
+      _scrollToBottom();
     } finally {
       setState(() {
         isLoading = false;
       });
+      _scrollToBottom();
     }
+  }
+
+  @override
+  void dispose() {
+    scrollController.dispose();
+    controller.dispose();
+    super.dispose();
   }
 
   @override
@@ -67,7 +92,7 @@ class _AssistantChatScreenState extends State<AssistantChatScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text("Sneakerhead Assistant", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: const Text("SoleMate AI", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         leading: Navigator.canPop(context) 
           ? IconButton(icon: const Icon(Icons.arrow_back_ios, color: Colors.black), onPressed: () => Navigator.pop(context))
           : null,
@@ -76,9 +101,25 @@ class _AssistantChatScreenState extends State<AssistantChatScreen> {
         children: [
           Expanded(
             child: ListView.builder(
+              controller: scrollController,
               padding: const EdgeInsets.all(16),
-              itemCount: messages.length,
+              itemCount: messages.length + (isLoading ? 1 : 0),
               itemBuilder: (context, index) {
+                if (index == messages.length) {
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: const Text("SoleMate sedang mengetik...", style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
+                    ),
+                  );
+                }
+
                 final msg = messages[index];
                 final isUser = msg["role"] == "user";
                 return Align(
@@ -96,22 +137,6 @@ class _AssistantChatScreenState extends State<AssistantChatScreen> {
               },
             ),
           ),
-          if (isLoading) 
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: const Text("Sedang mengetik...", style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
-                  ),
-                ],
-              ),
-            ),
           SafeArea(
             top: false,
             child: Container(
@@ -122,6 +147,7 @@ class _AssistantChatScreenState extends State<AssistantChatScreen> {
                 Expanded(
                   child: TextField(
                     controller: controller,
+                    onSubmitted: (_) => sendMessage(),
                     decoration: InputDecoration(
                       hintText: "Tulis pertanyaan...",
                       filled: true,

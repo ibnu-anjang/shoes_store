@@ -5,10 +5,13 @@ import '../../../widgets/smartImage.dart';
 class MyImageSlider extends StatelessWidget {
   final Function(int) onChange;
   final List<String> images;
+  final PageController? controller;
+  
   const MyImageSlider({
     super.key,
     required this.images,
     required this.onChange,
+    this.controller,
   });
 
   @override
@@ -22,7 +25,9 @@ class MyImageSlider extends StatelessWidget {
     return SizedBox(
       height: 250,
       child: PageView.builder(
+        controller: controller,
         itemCount: images.length,
+        physics: const BouncingScrollPhysics(),
         onPageChanged: onChange,
         itemBuilder: (context, index) {
           return GestureDetector(

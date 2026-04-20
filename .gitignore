@@ -21,6 +21,10 @@ env/
 .venv
 .vscode/
 
+# User uploaded files
+backend/uploads/*
+!backend/uploads/.gitkeep
+
 # IDEs
 .idea/
 .vscode/
