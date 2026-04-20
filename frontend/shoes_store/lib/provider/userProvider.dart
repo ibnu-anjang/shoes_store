@@ -15,7 +15,7 @@ class UserProvider extends ChangeNotifier {
   String get password => _password;
   String? get profileImagePath => _profileImagePath;
 
-  static UserProvider of(BuildContext context, {bool listen = true}) {
+  static UserProvider of(BuildContext context, {bool listen = false}) {
     return Provider.of<UserProvider>(context, listen: listen);
   }
 

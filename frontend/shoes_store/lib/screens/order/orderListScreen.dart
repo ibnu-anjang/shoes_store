@@ -7,6 +7,7 @@ import 'package:shoes_store/screens/detail/detailScreen.dart';
 import 'package:shoes_store/screens/order/orderDetailScreen.dart';
 import 'package:shoes_store/screens/cart/checkoutScreen.dart';
 import 'package:shoes_store/screens/review/reviewHelper.dart';
+import 'package:shoes_store/services/apiService.dart';
 
 class OrderListScreen extends StatefulWidget {
   final int initialIndex;
@@ -17,13 +18,67 @@ class OrderListScreen extends StatefulWidget {
 }
 
 class _OrderListScreenState extends State<OrderListScreen> {
+  final Set<String> _buyAgainLoading = {};
+
+  Future<void> _handleBuyAgain(Order order) async {
+    if (_buyAgainLoading.contains(order.id)) return;
+    setState(() => _buyAgainLoading.add(order.id));
+    try {
+      final products = await ApiService.getProducts();
+      final outOfStock = <String>[];
+      for (final item in order.items) {
+        final fresh = products.firstWhere(
+          (p) => p.id == item.product.id,
+          orElse: () => item.product,
+        );
+        final sku = fresh.skus.firstWhere(
+          (s) => s.variantName == item.selectedSize,
+          orElse: () => fresh.skus.isNotEmpty ? fresh.skus.first : item.sku,
+        );
+        if (sku.stockAvailable == 0) {
+          outOfStock.add('${item.product.title} (${item.selectedSize})');
+        }
+      }
+      if (!mounted) return;
+      if (outOfStock.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Stok habis: ${outOfStock.join(', ')}'),
+            backgroundColor: Colors.red.shade600,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+        return;
+      }
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CheckoutScreen(items: order.items, isBuyNow: true),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal memeriksa stok: $e'),
+            backgroundColor: Colors.red.shade600,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _buyAgainLoading.remove(order.id));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = OrderProvider.of(context);
     final orders = provider.orders;
 
     return DefaultTabController(
-      length: 5,
+      length: 6,
       initialIndex: widget.initialIndex,
       child: Scaffold(
         backgroundColor: kcontentColor,
@@ -59,7 +114,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
             ),
             tabs: const [
               Tab(text: "Semua"),
-              Tab(text: "Menunggu"),
+              Tab(text: "Menunggu Bayar"),
+              Tab(text: "Validasi"),
               Tab(text: "Diproses"),
               Tab(text: "Dikirim"),
               Tab(text: "Selesai"),
@@ -69,6 +125,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
         body: TabBarView(
           children: [
             _buildRefreshable(context, provider, _buildOrderList(context, orders)),
+            _buildRefreshable(context, provider,
+              _buildOrderList(context, orders.where((o) => o.status == OrderStatus.unpaid).toList())),
             _buildRefreshable(context, provider,
               _buildOrderList(context, orders.where((o) => o.status == OrderStatus.menungguVerifikasi).toList())),
             _buildRefreshable(context, provider,
@@ -340,21 +398,18 @@ class _OrderListScreenState extends State<OrderListScreen> {
                           ),
                         ),
                       const SizedBox(width: 10),
-                      // BELI LAGI BUTTON — langsung ke checkout
+                      // BELI LAGI BUTTON — cek stok dulu sebelum ke checkout
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => CheckoutScreen(
-                                  items: order.items,
-                                  isBuyNow: true,
-                                ),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.shopping_bag_outlined, size: 16),
+                          onPressed: _buyAgainLoading.contains(order.id)
+                              ? null
+                              : () => _handleBuyAgain(order),
+                          icon: _buyAgainLoading.contains(order.id)
+                              ? const SizedBox(
+                                  width: 14, height: 14,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: kprimaryColor),
+                                )
+                              : const Icon(Icons.shopping_bag_outlined, size: 16),
                           label: const Text(
                             'Beli Lagi',
                             style: TextStyle(fontSize: 12),
@@ -372,6 +427,30 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   ),
                 ),
 
+              if (order.status == OrderStatus.unpaid)
+                Padding(
+                  padding: const EdgeInsets.only(top: 15),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.amber.shade300),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.payment, color: Colors.amber.shade800, size: 14),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Segera Selesaikan Pembayaran',
+                          style: TextStyle(fontSize: 12, color: Colors.amber.shade900, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               if (order.status == OrderStatus.menungguVerifikasi)
                 Padding(
                   padding: const EdgeInsets.only(top: 15),
@@ -432,6 +511,10 @@ class _OrderListScreenState extends State<OrderListScreen> {
     Color textColor;
 
     switch (order.status) {
+      case OrderStatus.unpaid:
+        bgColor = Colors.amber.shade50;
+        textColor = Colors.amber.shade900;
+        break;
       case OrderStatus.menungguVerifikasi:
         bgColor = Colors.orange.shade50;
         textColor = Colors.orange.shade800;

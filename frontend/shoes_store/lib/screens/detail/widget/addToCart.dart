@@ -94,7 +94,7 @@ class _AddToCartState extends State<AddToCart> {
                            // For now we pass a dummy empty list if we assume Provider will fetch its own. 
                            // Actually addToCartRemote needs allProducts to rebuild local state correctly.
                            // Simpler: Just refresh.
-                           await provider.addToCartRemote(widget.selectedSku, currentIndex, []);
+                           await provider.addToCartRemote(widget.selectedSku, currentIndex, [], color: widget.selectedColor);
                            if (!mounted) return;
                            ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
@@ -141,6 +141,7 @@ class _AddToCartState extends State<AddToCart> {
                         final buyNowItem = CartItem(
                           product: widget.product,
                           sku: widget.selectedSku,
+                          color: widget.selectedColor,
                           quantity: currentIndex,
                         );
                         

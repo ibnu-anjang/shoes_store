@@ -99,7 +99,7 @@ class ItemDetails extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      "(${5 + localReviews.length} ulasan)",
+                      "(${localReviews.length} ulasan)",
                       style: const TextStyle(
                         color: Colors.grey,
                         fontSize: 14,

@@ -1,11 +1,12 @@
 import 'package:shoes_store/models/cartItem.dart';
 
 enum OrderStatus {
-  menungguVerifikasi,
-  diproses,
-  dalamPengiriman,
-  diterima,
-  dibatalkan,
+  unpaid,             // UNPAID — belum upload bukti pembayaran
+  menungguVerifikasi, // VERIFYING — sudah upload, menunggu validasi admin
+  diproses,           // PAID
+  dalamPengiriman,    // SHIPPED
+  diterima,           // DELIVERED / COMPLETED
+  dibatalkan,         // CANCELLED
 }
 
 class Order {
@@ -44,8 +45,10 @@ class Order {
 
   String get statusText {
     switch (status) {
-      case OrderStatus.menungguVerifikasi:
+      case OrderStatus.unpaid:
         return 'Menunggu Pembayaran';
+      case OrderStatus.menungguVerifikasi:
+        return 'Menunggu Validasi';
       case OrderStatus.diproses:
         return 'Pesanan Diproses';
       case OrderStatus.dalamPengiriman:
@@ -59,6 +62,8 @@ class Order {
 
   String get statusEmoji {
     switch (status) {
+      case OrderStatus.unpaid:
+        return '💳';
       case OrderStatus.menungguVerifikasi:
         return '⏳';
       case OrderStatus.diproses:

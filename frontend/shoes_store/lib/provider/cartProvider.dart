@@ -48,6 +48,7 @@ class CartProvider extends ChangeNotifier {
               id: item['id'],
               product: product,
               sku: sku,
+              color: item['color_hex'] != null ? hexToColor(item['color_hex']) : null,
               quantity: item['quantity'],
               isSelected: item['is_selected_for_checkout'] ?? true,
             );
@@ -63,9 +64,10 @@ class CartProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> addToCartRemote(ProductSku sku, int qty, List<Product> allProducts) async {
+  Future<void> addToCartRemote(ProductSku sku, int qty, List<Product> allProducts, {Color? color}) async {
     try {
-      await ApiService.addToCart(sku.id, qty);
+      final colorHex = color != null ? colorToHex(color) : null;
+      await ApiService.addToCart(sku.id, qty, colorHex: colorHex);
       await fetchCart(allProducts);
     } catch (e) {
       rethrow;

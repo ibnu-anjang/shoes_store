@@ -19,31 +19,48 @@ import 'package:shoes_store/services/authService.dart';
 import 'package:shoes_store/services/productService.dart';
 import 'package:shoes_store/widgets/fullScreenViewer.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  Future<void> _refresh() async {
+    await Future.wait([
+      UserProvider.of(context).loadUser(),
+      OrderProvider.of(context).loadOrders(),
+    ]);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final orderProvider = OrderProvider.of(context);
-    final userProvider = UserProvider.of(context);
-    
+    final orderProvider = OrderProvider.of(context, listen: true);
+    final userProvider = UserProvider.of(context, listen: true);
+
     return Scaffold(
       backgroundColor: kcontentColor,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // HEADER SECTION
-            _buildHeader(context, userProvider),
-            const SizedBox(height: 20),
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        color: kprimaryColor,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              // HEADER SECTION
+              _buildHeader(context, userProvider),
+              const SizedBox(height: 20),
 
-            // ORDER STATUS DASHBOARD
-            _buildOrderDashboard(context, orderProvider),
-            const SizedBox(height: 20),
+              // ORDER STATUS DASHBOARD
+              _buildOrderDashboard(context, orderProvider),
+              const SizedBox(height: 20),
 
-            // MENU SECTION
-            _buildMenuSection(context),
-            const SizedBox(height: 100), // Padding bottom
-          ],
+              // MENU SECTION
+              _buildMenuSection(context),
+              const SizedBox(height: 100),
+            ],
+          ),
         ),
       ),
     );
@@ -91,7 +108,7 @@ class ProfileScreen extends StatelessWidget {
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: kprimaryColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                  decoration: BoxDecoration(color: kprimaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
                   child: const Text("Premium Member", style: TextStyle(color: kprimaryColor, fontSize: 10, fontWeight: FontWeight.bold)),
                 ),
               ],
@@ -107,11 +124,12 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildOrderDashboard(BuildContext context, OrderProvider provider) {
-    // Counts for badges
-    final unpaidCount = provider.orders.where((o) => o.status == OrderStatus.menungguVerifikasi).length;
-    final processingCount = provider.orders.where((o) => o.status == OrderStatus.diproses).length;
-    final shippingCount = provider.orders.where((o) => o.status == OrderStatus.dalamPengiriman).length;
-    final receivedCount = provider.orders.where((o) => o.status == OrderStatus.diterima && !o.isReviewed).length;
+    // Tab index: 0=Semua, 1=Menunggu Bayar, 2=Validasi, 3=Diproses, 4=Dikirim, 5=Selesai
+    final unpaidCount      = provider.orders.where((o) => o.status == OrderStatus.unpaid).length;
+    final validasiCount    = provider.orders.where((o) => o.status == OrderStatus.menungguVerifikasi).length;
+    final processingCount  = provider.orders.where((o) => o.status == OrderStatus.diproses).length;
+    final shippingCount    = provider.orders.where((o) => o.status == OrderStatus.dalamPengiriman).length;
+    final reviewCount      = provider.orders.where((o) => o.status == OrderStatus.diterima && !o.isReviewed).length;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -119,7 +137,7 @@ class ProfileScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 5))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 5))],
       ),
       child: Column(
         children: [
@@ -142,10 +160,11 @@ class ProfileScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _orderDashboardItem(context, Icons.payment_outlined, "Belum Bayar", unpaidCount, 1),
-              _orderDashboardItem(context, Icons.inventory_2_outlined, "Dikemas", processingCount, 2),
-              _orderDashboardItem(context, Icons.local_shipping_outlined, "Dikirim", shippingCount, 3),
-              _orderDashboardItem(context, Icons.star_outline, "Beri Ulasan", receivedCount, 4),
+              _orderDashboardItem(context, Icons.payment_outlined,      "Belum Bayar", unpaidCount,     1),
+              _orderDashboardItem(context, Icons.hourglass_top_outlined, "Validasi",   validasiCount,   2),
+              _orderDashboardItem(context, Icons.inventory_2_outlined,  "Dikemas",     processingCount, 3),
+              _orderDashboardItem(context, Icons.local_shipping_outlined,"Dikirim",    shippingCount,   4),
+              _orderDashboardItem(context, Icons.star_outline,          "Ulasan",      reviewCount,     5),
             ],
           ),
         ],

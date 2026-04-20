@@ -13,7 +13,7 @@ class FavoriteScreen extends StatefulWidget {
 class _FavoriteScreenState extends State<FavoriteScreen> {
   @override
   Widget build(BuildContext context) {
-    final provider = FavoriteProvider.of(context);
+    final provider = FavoriteProvider.of(context, listen: true);
     final finalList = provider.favorites;
     return Scaffold(
       backgroundColor: kcontentColor,
@@ -27,9 +27,38 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
         ),
         centerTitle: true,
       ),
-      body: Column(
+      body: provider.isLoading && finalList.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
         children: [
-          Expanded(child: ListView.builder(
+          Expanded(child: RefreshIndicator(
+            onRefresh: () => provider.loadFavorites(),
+            color: kprimaryColor,
+            child: finalList.isEmpty
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      SizedBox(
+                        height: 400,
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.favorite_border, size: 80, color: Colors.grey.shade300),
+                              const SizedBox(height: 15),
+                              Text('Belum ada favorit',
+                                  style: TextStyle(fontSize: 18, color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 8),
+                              Text('Tarik ke bawah untuk refresh',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade400)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
               itemCount:finalList.length,
               itemBuilder: (context, index){
                 final favoritItem = finalList[index];
@@ -113,7 +142,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
               );
             },
             ),
-            ),
+          )),
         ],
       ),
     );

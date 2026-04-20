@@ -12,6 +12,8 @@ import 'package:shoes_store/services/authService.dart';
 import 'package:shoes_store/screens/auth/loginScreen.dart';
 import 'package:shoes_store/screens/profile/address/addressListScreen.dart';
 import 'package:shoes_store/screens/profile/address/addAddressScreen.dart';
+import 'package:shoes_store/provider/userProvider.dart';
+import 'package:shoes_store/services/apiService.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final List<CartItem> items;
@@ -28,6 +30,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final TextEditingController _waController = TextEditingController();
   String _selectedMethod = 'Bank Transfer';
   bool _isCheckingOut = false;
+  Map<String, String> _paymentConfig = {};
+
+  @override
+  void initState() {
+    super.initState();
+    ApiService.getPaymentConfig().then((cfg) {
+      if (mounted) setState(() => _paymentConfig = cfg);
+    });
+  }
 
   final List<Map<String, dynamic>> _methods = [
     {
@@ -49,6 +60,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       'description': 'Bayar saat kurir mengantar barang',
     },
   ];
+
+  // Replikasi rumus backend: sum(ord(c) for c in username) % 100 + 1
+  int _calcUniqueCode(String username) =>
+      username.codeUnits.fold(0, (s, c) => s + c) % 100 + 1;
+
+  Widget _buildQrisWidget(double size) {
+    final qrisUrl = _paymentConfig['qris_image'] ?? '';
+    if (qrisUrl.isNotEmpty) {
+      return Image.network(
+        ApiService.normalizeImage(qrisUrl),
+        width: size, height: size, fit: BoxFit.contain,
+        errorBuilder: (ctx, e, s) => Icon(Icons.qr_code_2, size: size * 0.4, color: Colors.grey),
+      );
+    }
+    return Image.asset(
+      'assets/images/qris_payment.png',
+      fit: BoxFit.contain,
+      errorBuilder: (ctx, e, s) => Icon(Icons.qr_code_2, size: size * 0.4, color: Colors.grey),
+    );
+  }
 
   double get _subtotal {
     double total = 0;
@@ -97,14 +128,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final addressProvider = AddressProvider.of(context, listen: false);
 
     // Confirmation Dialog before placing order
+    final bool isCod = _selectedMethod == 'COD';
+    final username = UserProvider.of(context).userName;
+    final uniqueCode = isCod ? 0 : _calcUniqueCode(username);
+    final grandTotal = _total + uniqueCode;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          "Konfirmasi Pesanan",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
+        title: const Text("Konfirmasi Pesanan", style: TextStyle(fontWeight: FontWeight.bold)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -114,24 +147,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  "Estimasi Total:",
-                  style: TextStyle(color: Colors.grey),
-                ),
+                const Text("Total Tagihan:", style: TextStyle(color: Colors.grey)),
                 Text(
-                  formatRupiah(_total),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: kprimaryColor,
-                  ),
+                  formatRupiah(isCod ? _total : grandTotal),
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: kprimaryColor),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              '* Total akhir akan bertambah kode unik (Rp 1–100) untuk identifikasi pembayaran.',
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontStyle: FontStyle.italic),
-            ),
+            if (!isCod) ...[
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text("  (sudah termasuk kode unik)", style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                  Text(formatRupiah(uniqueCode.toDouble()),
+                      style: TextStyle(fontSize: 11, color: Colors.orange.shade600, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ],
           ],
         ),
         actions: [
@@ -177,11 +210,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     if (!mounted) return;
     setState(() => _isCheckingOut = true);
+    // Map UI label ke kode backend
+    final pmMap = {'Bank Transfer': 'TF', 'QRIS': 'QRIS', 'COD': 'COD'};
+    final paymentMethodCode = pmMap[_selectedMethod] ?? 'TF';
     try {
       final order = await orderProvider.checkout(
         items: widget.items,
         address: _alamatController.text,
         phone: _waController.text,
+        paymentMethod: paymentMethodCode,
       );
 
       addressProvider.clearSelectedAddress();
@@ -496,9 +533,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               item.product.title,
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
-            subtitle: Text(
-              "${item.sku.variantName} | x${item.quantity}",
-              style: const TextStyle(fontSize: 12),
+            subtitle: Row(
+              children: [
+                Text(
+                  "${item.sku.variantName} | x${item.quantity}",
+                  style: const TextStyle(fontSize: 12),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: item.selectedColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.grey.shade300, width: 0.5),
+                  ),
+                ),
+              ],
             ),
             trailing: Text(
               formatRupiah(item.totalPrice),
@@ -582,9 +633,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                 ),
                 const SizedBox(height: 15),
-                _detailRow('Bank', 'BCA (Modern Shoes Store)'),
-                _detailRow('No. Rekening', '7712 8890 1234'),
-                _detailRow('Nama Penerima', 'PT Shoes Store Modern'),
+                _detailRow('Bank', _paymentConfig['tf_bank_name'] ?? 'BCA (Modern Shoes Store)'),
+                _detailRow('No. Rekening', _paymentConfig['tf_account_number'] ?? '7712 8890 1234'),
+                _detailRow('Nama Penerima', _paymentConfig['tf_account_holder'] ?? 'PT Shoes Store Modern'),
                 const SizedBox(height: 10),
                 const Text(
                   '*Mohon simpan bukti transfer Anda',
@@ -622,32 +673,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(15),
-                    child: Image.asset(
-                      'assets/images/qris_payment.png',
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.qr_code_2,
-                            size: 80,
-                            color: Colors.grey,
-                          ),
-                          const SizedBox(height: 10),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            child: Text(
-                              'Ganti file di:\nassets/images/qris_payment.png',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey.shade400,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    child: _buildQrisWidget(200),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -683,6 +709,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildPriceSummary() {
     final bool needsUniqueCode = _selectedMethod != 'COD';
+    final username = UserProvider.of(context).userName;
+    final uniqueCode = needsUniqueCode ? _calcUniqueCode(username) : 0;
+    final grandTotal = _total + uniqueCode;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -696,9 +726,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           const SizedBox(height: 10),
           _summaryRow(
             "Biaya Pengiriman",
-            CartProvider.flatOngkir == 0
-                ? "Gratis"
-                : formatRupiah(CartProvider.flatOngkir),
+            CartProvider.flatOngkir == 0 ? "Gratis" : formatRupiah(CartProvider.flatOngkir),
           ),
           if (needsUniqueCode) ...[
             const SizedBox(height: 10),
@@ -707,27 +735,28 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               children: [
                 Row(
                   children: [
-                    Text(
-                      "Kode Unik",
-                      style: TextStyle(color: Colors.grey.shade600),
-                    ),
+                    Text("Kode Unik", style: TextStyle(color: Colors.grey.shade600)),
                     const SizedBox(width: 5),
                     Tooltip(
-                      message:
-                          'Ditambahkan ke total agar pembayaranmu mudah diidentifikasi sistem',
-                      child: Icon(
-                        Icons.info_outline,
-                        size: 14,
-                        color: Colors.grey.shade400,
-                      ),
+                      message: 'Ditambahkan agar pembayaranmu mudah diidentifikasi sistem',
+                      child: Icon(Icons.info_outline, size: 14, color: Colors.grey.shade400),
                     ),
                   ],
                 ),
-                Text(
-                  "+ Rp 1–100",
-                  style: TextStyle(
-                    color: Colors.orange.shade700,
-                    fontWeight: FontWeight.w500,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Text(
+                    "+ ${formatRupiah(uniqueCode.toDouble())}",
+                    style: TextStyle(
+                      color: Colors.orange.shade700,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ],
@@ -737,17 +766,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                "Total Tagihan",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
+              const Text("Total Tagihan", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               Text(
-                formatRupiah(_total),
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                  color: kprimaryColor,
-                ),
+                formatRupiah(needsUniqueCode ? grandTotal : _total),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: kprimaryColor),
               ),
             ],
           ),
@@ -755,12 +777,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                '* Total akhir di detail pesanan akan berbeda karena penambahan kode unik (Rp 1–100) untuk identifikasi pembayaran.',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey.shade500,
-                  fontStyle: FontStyle.italic,
-                ),
+                '* Sudah termasuk kode unik ${formatRupiah(uniqueCode.toDouble())} untuk identifikasi transfer.',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontStyle: FontStyle.italic),
               ),
             ),
         ],

@@ -5,6 +5,7 @@ class CartItem {
   final int? id; // ID from backend Database (cart_items.id or order_items.id)
   final Product product;
   final ProductSku sku;
+  final Color? color;
   int quantity;
   bool isSelected;
   bool isReviewed; // hanya relevan pada order items
@@ -13,6 +14,7 @@ class CartItem {
     this.id,
     required this.product,
     required this.sku,
+    this.color,
     this.quantity = 1,
     this.isSelected = true,
     this.isReviewed = false,
@@ -22,5 +24,5 @@ class CartItem {
   double get totalPrice => sku.price * quantity;
 
   String get selectedSize => sku.variantName;
-  Color get selectedColor => Colors.black; // Standard placeholder
+  Color get selectedColor => color ?? Colors.black;
 }

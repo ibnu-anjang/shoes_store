@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Boolean, Double
 from sqlalchemy.orm import relationship
 from app.database import Base
 import datetime
@@ -13,12 +13,14 @@ class Product(Base):
     category = Column(String(50))
     rating = Column(Float, default=0.0)
     is_active = Column(Boolean, default=True)
+    specification = Column(String(500), nullable=True) # Informasi teknis produk
 
     # Base price (harga termurah/patokan)
-    price = Column(Float, nullable=False, default=0.0) 
+    price = Column(Double, nullable=False, default=0.0) 
 
     skus = relationship("ProductSku", back_populates="product", cascade="all, delete-orphan")
     colors = relationship("ProductColor", back_populates="product", cascade="all, delete-orphan")
+    gallery = relationship("ProductImage", back_populates="product", cascade="all, delete-orphan")
 
 class ProductColor(Base):
     __tablename__ = "product_colors"
@@ -28,13 +30,22 @@ class ProductColor(Base):
     
     product = relationship("Product", back_populates="colors")
 
+class ProductImage(Base):
+    __tablename__ = "product_images"
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"))
+    image_url = Column(String(255), nullable=False)
+    
+    product = relationship("Product", back_populates="gallery")
+
 class ProductSku(Base):
     __tablename__ = "product_skus"
     
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id"))
     variant_name = Column(String(50), nullable=False) # misal: "Size 40", "Size 41"
-    price = Column(Float, nullable=False)
+    color_hex = Column(String(50), nullable=True)     # Link to specific color (hex)
+    price = Column(Double, nullable=False)
     stock_available = Column(Integer, default=0)
     stock_reserved = Column(Integer, default=0)
     
@@ -67,6 +78,7 @@ class CartItem(Base):
     cart_id = Column(Integer, ForeignKey("carts.id"))
     sku_id = Column(Integer, ForeignKey("product_skus.id"))
     quantity = Column(Integer, default=1)
+    color_hex = Column(String(50), nullable=True) # e.g. "0xFFFFFFFF"
     is_selected_for_checkout = Column(Boolean, default=True)
     
     cart = relationship("Cart", back_populates="items")
@@ -75,12 +87,15 @@ class Order(Base):
     __tablename__ = "orders"
     id = Column(String(50), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    subtotal = Column(Float, nullable=True)       # harga produk murni (tanpa kode unik)
+    subtotal = Column(Double, nullable=True)       # harga produk murni (tanpa kode unik)
     unique_code = Column(Integer)
-    total = Column(Float)                          # total_payment = subtotal + unique_code
+    total = Column(Double)                          # total_payment = subtotal + unique_code
     status = Column(String(50)) # UNPAID, VERIFYING, PAID, SHIPPED, COMPLETED, CANCELLED
     tanggal = Column(DateTime, default=datetime.datetime.utcnow)
     expired_at = Column(DateTime)
+    shipped_at = Column(DateTime, nullable=True)
+    payment_method = Column(String(20), nullable=True)   # TF, QRIS, COD
+    tracking_number = Column(String(100), nullable=True)
     shipping_address = Column(String(255))
     phone = Column(String(20))
     
@@ -93,7 +108,8 @@ class OrderItem(Base):
     order_id = Column(String(50), ForeignKey("orders.id"))
     sku_id = Column(Integer, ForeignKey("product_skus.id"))
     quantity = Column(Integer)
-    price_at_checkout = Column(Float)
+    price_at_checkout = Column(Double)
+    color_hex = Column(String(50), nullable=True)
     
     order = relationship("Order", back_populates="items")
     sku = relationship("ProductSku")
@@ -134,6 +150,12 @@ class PromoBanner(Base):
     id = Column(Integer, primary_key=True, index=True)
     image_url = Column(String(255))
     is_active = Column(Boolean, default=True)
+
+class SiteSetting(Base):
+    """Key-value store untuk konfigurasi toko (info TF, QRIS image, dll)."""
+    __tablename__ = "site_settings"
+    key   = Column(String(50), primary_key=True)
+    value = Column(String(500), nullable=True)
 
 class TransactionLog(Base):
     __tablename__ = "transaction_logs"

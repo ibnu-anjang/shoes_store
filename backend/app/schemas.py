@@ -6,6 +6,7 @@ import re
 # --- SKU SCHEMAS ---
 class ProductSkuBase(BaseModel):
     variant_name: str
+    color_hex: Optional[str] = None
     price: float
     stock_available: int
     stock_reserved: int
@@ -31,6 +32,12 @@ class ProductColorResponse(ProductColorBase):
     class Config:
         from_attributes = True
 
+class ProductImageResponse(BaseModel):
+    id: int
+    image_url: str
+    class Config:
+        from_attributes = True
+
 # --- PRODUCT SCHEMAS ---
 class ProductBase(BaseModel):
     name: str
@@ -38,17 +45,20 @@ class ProductBase(BaseModel):
     description: Optional[str] = None
     image: Optional[str] = None
     category: Optional[str] = None
+    specification: Optional[str] = None
     rating: float = 0.0
     is_active: bool = True
 
 class ProductCreate(ProductBase):
     skus: List[ProductSkuCreate] = []
     colors: List[ProductColorCreate] = []
+    gallery: List[str] = [] # List of image URLs/paths
 
 class ProductResponse(ProductBase):
     id: int
     skus: List[ProductSkuResponse] = []
     colors: List[ProductColorResponse] = []
+    gallery: List[ProductImageResponse] = []
     class Config:
         from_attributes = True
 
@@ -123,12 +133,14 @@ class FavoriteResponse(FavoriteBase):
 class CartItemAdd(BaseModel):
     sku_id: int
     quantity: int = 1
+    color_hex: Optional[str] = None
 
 class CartItemResponse(BaseModel):
     id: int
     cart_id: int
     sku_id: int
     quantity: int
+    color_hex: Optional[str] = None
     is_selected_for_checkout: bool
     class Config:
         from_attributes = True
@@ -162,6 +174,7 @@ class OrderItemResponse(BaseModel):
     sku_id: int
     quantity: int
     price_at_checkout: float
+    color_hex: Optional[str] = None
     product_name: Optional[str] = None
     product_image: Optional[str] = None
     variant_name: Optional[str] = None
@@ -174,15 +187,18 @@ class OrderBase(BaseModel):
 
 class OrderStatusUpdate(BaseModel):
     status: str
+    tracking_number: Optional[str] = None
 
 class CheckoutItem(BaseModel):
     sku_id: int
     quantity: int
+    color_hex: Optional[str] = None
 
 class OrderCreate(BaseModel):
     address: str
     phone: str
     items: List[CheckoutItem]
+    payment_method: str = 'TF'   # TF, QRIS, COD
 
 class OrderResponse(OrderBase):
     id: str  # id berupa string (unik kode order dari frontend/backend)
@@ -191,6 +207,9 @@ class OrderResponse(OrderBase):
     unique_code: int
     tanggal: datetime.datetime
     expired_at: datetime.datetime
+    shipped_at: Optional[datetime.datetime] = None
+    payment_method: Optional[str] = None
+    tracking_number: Optional[str] = None
     shipping_address: Optional[str] = None
     phone: Optional[str] = None
     items: List[OrderItemResponse] = []
@@ -204,6 +223,8 @@ class ProductUpdate(BaseModel):
     price: Optional[float] = None
     description: Optional[str] = None
     category: Optional[str] = None
+    specification: Optional[str] = None
+    colors: Optional[List[ProductColorCreate]] = None
 
 # --- CHAT SCHEMAS ---
 class ChatRequest(BaseModel):

@@ -7,11 +7,14 @@ class ProductSku {
   final double price;
   final int stockAvailable;
 
+  final String? colorHex; // Hex color linked to this SKU
+  
   ProductSku({
     required this.id,
     required this.variantName,
     required this.price,
     required this.stockAvailable,
+    this.colorHex,
   });
 
   factory ProductSku.fromJson(Map<String, dynamic> json) {
@@ -20,6 +23,7 @@ class ProductSku {
       variantName: json['variant_name'] ?? '',
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       stockAvailable: json['stock_available'] ?? 0,
+      colorHex: json['color_hex'],
     );
   }
 }
@@ -36,6 +40,7 @@ class Product {
   final List<Color> colors;
   final List<String> sizes; // Deprecated: use skus instead for real logic
   final List<ProductSku> skus;
+  final List<String> gallery; // Gallery image URLs
   final String category;
   final double rate;
   int quantity;
@@ -51,6 +56,7 @@ class Product {
     required this.colors,
     required this.sizes,
     required this.skus,
+    required this.gallery,
     required this.type,
     required this.category,
     required this.rate,
@@ -67,6 +73,36 @@ class Product {
 
   factory Product.fromJson(Map<String, dynamic> json) {
     var skusList = (json['skus'] as List?)?.map((i) => ProductSku.fromJson(i)).toList() ?? [];
+    
+    // Parse colors from API
+    List<Color> colorList = [];
+    if (json['colors'] != null) {
+      for (var c in json['colors']) {
+        final hex = c['color_hex'];
+        if (hex != null) {
+          colorList.add(hexToColor(hex));
+        }
+      }
+    }
+    if (colorList.isEmpty) colorList = [Colors.black, Colors.white, Colors.grey]; // Fallback
+    
+    // Parse gallery
+    List<String> galleryList = [];
+    if (json['gallery'] != null) {
+      for (var img in json['gallery']) {
+        final url = img['image_url'];
+        if (url != null) {
+          galleryList.add(_normalizeImageUrl(url));
+        }
+      }
+    }
+    // Tambahkan main image ke depan gallery jika belum ada
+    if (json['image'] != null && !galleryList.contains(_normalizeImageUrl(json['image']))) {
+      galleryList.insert(0, _normalizeImageUrl(json['image']));
+    }
+    if (galleryList.isEmpty && json['image'] != null) {
+       galleryList.add(_normalizeImageUrl(json['image']));
+    }
 
     return Product(
       id: json['id'] ?? 0,
@@ -77,9 +113,10 @@ class Product {
       review: "0 Reviews", 
       type: json['category'] ?? "Sneakers",          
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
-      colors: [Colors.black, Colors.white, Colors.grey],    
+      colors: colorList,    
       sizes: skusList.map((s) => s.variantName).toList(), 
       skus: skusList,
+      gallery: galleryList,
       category: json['category'] ?? "Shoes",        
       rate: (json['rating'] as num?)?.toDouble() ?? 0.0,                 
       quantity: 1,
@@ -92,6 +129,23 @@ class Product {
         'description': description,
         'price': price,
       };
+}
+
+Color hexToColor(String hex) {
+  try {
+    if (hex.startsWith('0x')) {
+      return Color(int.parse(hex));
+    } else if (hex.startsWith('#')) {
+      return Color(int.parse(hex.replaceFirst('#', '0xFF')));
+    }
+    return Color(int.parse('0xFF' + hex));
+  } catch (e) {
+    return Colors.black;
+  }
+}
+
+String colorToHex(Color color) {
+  return '0x${color.value.toRadixString(16).padLeft(8, '0').toUpperCase()}';
 }
 
 // Global products list - will be populated from API, but keep as fallback

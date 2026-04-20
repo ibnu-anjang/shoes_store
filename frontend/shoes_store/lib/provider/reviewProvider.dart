@@ -168,13 +168,11 @@ class ReviewProvider extends ChangeNotifier {
     final productReviews = _reviews[productId] ?? [];
     if (productReviews.isEmpty) return initialRate;
 
-    // Gabungkan rating awal (diasumsikan dari 5 review) dengan review baru
-    double totalStars = initialRate * 5;
-    int totalCount = 5 + productReviews.length;
+    double totalStars = 0;
     for (var review in productReviews) {
       totalStars += review.rating;
     }
-    return totalStars / totalCount;
+    return totalStars / productReviews.length;
   }
 
   /// Wipe semua data saat logout agar tidak bocor ke akun berikutnya.

@@ -4,26 +4,32 @@ import '../../../widgets/smartImage.dart';
 
 class MyImageSlider extends StatelessWidget {
   final Function(int) onChange;
-  final String image;
+  final List<String> images;
   const MyImageSlider({
     super.key,
-    required this.image,
+    required this.images,
     required this.onChange,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (images.isEmpty) {
+      return const SizedBox(
+        height: 250,
+        child: Center(child: Icon(Icons.image_not_supported, size: 50, color: Colors.grey)),
+      );
+    }
     return SizedBox(
       height: 250,
       child: PageView.builder(
-        itemCount: 1, // Batasi jumlah gambar agar tidak bisa digeser tanpa henti
+        itemCount: images.length,
         onPageChanged: onChange,
         itemBuilder: (context, index) {
           return GestureDetector(
-            onTap: () => FullScreenViewer.show(context, image),
+            onTap: () => FullScreenViewer.show(context, images[index]),
             child: Hero(
-              tag: image,
-              child: SmartImage(url: image),
+              tag: images[index],
+              child: SmartImage(url: images[index]),
             ),
           );
         },

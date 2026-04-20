@@ -43,7 +43,7 @@ class _DescriptionState extends State<Description> {
       final url = profilePicture.startsWith('http')
           ? profilePicture
           : ApiService.normalizeImage(profilePicture);
-      if (url != null && url.isNotEmpty) {
+      if (url.isNotEmpty) {
         imageProvider = NetworkImage(url);
       }
     }
@@ -95,7 +95,7 @@ class _DescriptionState extends State<Description> {
               ),
               const SizedBox(width: 8),
               Text(
-                "(${5 + localReviews.length} Reviews)",
+                "(${localReviews.length} Reviews)",
                 style: const TextStyle(color: Colors.grey),
               ),
             ],

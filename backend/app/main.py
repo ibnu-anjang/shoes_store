@@ -10,7 +10,7 @@ from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Hea
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import text
-from typing import List
+from typing import List, Optional
 from passlib.context import CryptContext
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -93,14 +93,32 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 models.Base.metadata.create_all(bind=database.engine)
 
-# Migration: tambah kolom subtotal jika belum ada (untuk data lama)
+# Migration: tambah kolom baru jika belum ada
 with database.engine.connect() as _conn:
-    try:
-        _conn.execute(text("ALTER TABLE orders ADD COLUMN subtotal FLOAT NULL"))
-        _conn.commit()
-        logger.info("Migration: kolom subtotal berhasil ditambahkan ke tabel orders")
-    except Exception:
-        pass  # Kolom sudah ada, tidak perlu migrasi
+    for col_sql in [
+        "ALTER TABLE orders ADD COLUMN subtotal FLOAT NULL",
+        "ALTER TABLE orders ADD COLUMN shipped_at DATETIME NULL",
+        "ALTER TABLE orders ADD COLUMN payment_method VARCHAR(20) NULL",
+        "ALTER TABLE orders ADD COLUMN tracking_number VARCHAR(100) NULL",
+    ]:
+        try:
+            _conn.execute(text(col_sql))
+            _conn.commit()
+        except Exception:
+            pass
+
+# Seed default payment config jika belum ada
+_PAYMENT_DEFAULTS = {
+    "tf_bank_name":       "BCA (Modern Shoes Store)",
+    "tf_account_number":  "7712 8890 1234",
+    "tf_account_holder":  "PT Shoes Store Modern",
+    "qris_image":         "",   # path relatif dari /uploads/
+}
+with database.SessionLocal() as _sess:
+    for k, v in _PAYMENT_DEFAULTS.items():
+        if not _sess.get(models.SiteSetting, k):
+            _sess.add(models.SiteSetting(key=k, value=v))
+    _sess.commit()
 
 os.makedirs("uploads", exist_ok=True)
 
@@ -141,10 +159,14 @@ def _enrich_order_items(orders, user_id: int = None, db: Session = None):
             "id": order.id,
             "user_id": order.user_id,
             "total": order.total,
+            "subtotal": order.subtotal,
             "unique_code": order.unique_code,
             "status": order.status,
             "tanggal": order.tanggal,
             "expired_at": order.expired_at,
+            "shipped_at": order.shipped_at,
+            "payment_method": order.payment_method,
+            "tracking_number": order.tracking_number,
             "shipping_address": order.shipping_address,
             "phone": order.phone,
             "payment": None,
@@ -186,30 +208,52 @@ def _enrich_order_items(orders, user_id: int = None, db: Session = None):
 # ---------------------------------------------------------------------------
 # Background Worker — Auto-cancel UNPAID orders
 # ---------------------------------------------------------------------------
+def _return_stock_for_order(order, db: Session):
+    """Kembalikan stok untuk semua item di order (dipakai saat cancel)."""
+    for item in order.items:
+        if item.sku_id:
+            sku = db.query(models.ProductSku).filter(models.ProductSku.id == item.sku_id).first()
+            if sku:
+                sku.stock_available += item.quantity
+                sku.stock_reserved = max(0, sku.stock_reserved - item.quantity)
+
+
 async def auto_cancel_orders_worker():
     while True:
         db = None
         try:
             db = database.SessionLocal()
             now = datetime.datetime.utcnow()
+
+            # Auto-cancel UNPAID dan VERIFYING yang melewati expired_at
             expired_orders = db.query(models.Order).filter(
-                models.Order.status == "UNPAID",
+                models.Order.status.in_(["UNPAID", "VERIFYING"]),
                 models.Order.expired_at < now
             ).all()
-
+            for order in expired_orders:
+                order.status = "CANCELLED"
+                _return_stock_for_order(order, db)
             if expired_orders:
-                for order in expired_orders:
-                    order.status = "CANCELLED"
-                    for item in order.items:
-                        if item.sku_id:
-                            sku = db.query(models.ProductSku).filter(
-                                models.ProductSku.id == item.sku_id
-                            ).first()
-                            if sku:
-                                sku.stock_available += item.quantity
-                                sku.stock_reserved -= item.quantity
                 db.commit()
-                logger.info(f"Auto-cancel: {len(expired_orders)} order dibatalkan dan stok dikembalikan.")
+                logger.info(f"Auto-cancel: {len(expired_orders)} order dibatalkan.")
+
+            # Auto-complete SHIPPED yang sudah > 24 jam sejak dikirim
+            shipped_cutoff = now - datetime.timedelta(hours=24)
+            shipped_orders = db.query(models.Order).filter(
+                models.Order.status == "SHIPPED",
+                models.Order.shipped_at != None,
+                models.Order.shipped_at < shipped_cutoff
+            ).all()
+            for order in shipped_orders:
+                order.status = "DELIVERED"
+                for item in order.items:
+                    if item.sku_id:
+                        sku = db.query(models.ProductSku).filter(models.ProductSku.id == item.sku_id).first()
+                        if sku:
+                            sku.stock_reserved = max(0, sku.stock_reserved - item.quantity)
+            if shipped_orders:
+                db.commit()
+                logger.info(f"Auto-complete: {len(shipped_orders)} order otomatis selesai.")
 
         except Exception as e:
             logger.error(f"Background worker error: {e}", exc_info=True)
@@ -311,16 +355,23 @@ def get_all_products(db: Session = Depends(database.get_db)):
 def create_product(product: schemas.ProductCreate, db: Session = Depends(database.get_db)):
     new_product = models.Product(
         name=product.name, price=product.price, description=product.description,
+        specification=product.specification,
         image=product.image, category=product.category, rating=product.rating
     )
     db.add(new_product)
     db.commit()
     db.refresh(new_product)
 
+    # Add gallery images
+    for img_url in product.gallery:
+        if img_url:
+            db.add(models.ProductImage(product_id=new_product.id, image_url=img_url))
+
     for sku_data in product.skus:
         sku = models.ProductSku(
             product_id=new_product.id,
             variant_name=sku_data.variant_name,
+            color_hex=sku_data.color_hex,
             price=sku_data.price,
             stock_available=sku_data.stock_available,
             stock_reserved=sku_data.stock_reserved
@@ -376,7 +427,8 @@ def upsert_cart_item(item: schemas.CartItemAdd, username: str = Depends(get_curr
 
     existing_item = db.query(models.CartItem).filter(
         models.CartItem.cart_id == cart.id,
-        models.CartItem.sku_id == item.sku_id
+        models.CartItem.sku_id == item.sku_id,
+        models.CartItem.color_hex == item.color_hex
     ).first()
 
     # Hitung total quantity yang akan ada di keranjang setelah operasi ini
@@ -391,8 +443,15 @@ def upsert_cart_item(item: schemas.CartItemAdd, username: str = Depends(get_curr
 
     if existing_item:
         existing_item.quantity = new_total_qty
+        if item.color_hex:
+            existing_item.color_hex = item.color_hex
     else:
-        new_item = models.CartItem(cart_id=cart.id, sku_id=item.sku_id, quantity=item.quantity)
+        new_item = models.CartItem(
+            cart_id=cart.id, 
+            sku_id=item.sku_id, 
+            quantity=item.quantity,
+            color_hex=item.color_hex
+        )
         db.add(new_item)
 
     db.commit()
@@ -477,14 +536,19 @@ def checkout_cart(payload: schemas.OrderCreate, username: str = Depends(get_curr
 
     try:
         order_id = str(uuid.uuid4())[:8].upper()
-        unique_code = sum([ord(c) for c in user.username]) % 100 + 1  # 1-100, agar tidak terlalu besar
+        is_cod = payload.payment_method.upper() == 'COD'
+
+        # COD: tidak pakai kode unik, langsung diproses
+        unique_code = 0 if is_cod else (sum([ord(c) for c in user.username]) % 100 + 1)
+        initial_status = "PAID" if is_cod else "UNPAID"
 
         new_order = models.Order(
             id=order_id,
             user_id=user.id,
             total=0.0,
             unique_code=unique_code,
-            status="UNPAID",
+            status=initial_status,
+            payment_method=payload.payment_method.upper(),
             expired_at=datetime.datetime.utcnow() + datetime.timedelta(hours=24),
             shipping_address=payload.address,
             phone=payload.phone
@@ -514,7 +578,8 @@ def checkout_cart(payload: schemas.OrderCreate, username: str = Depends(get_curr
                 order_id=order_id,
                 sku_id=item.sku_id,
                 quantity=item.quantity,
-                price_at_checkout=sku.price
+                price_at_checkout=sku.price,
+                color_hex=item.color_hex
             )
             db.add(order_item)
 
@@ -525,7 +590,7 @@ def checkout_cart(payload: schemas.OrderCreate, username: str = Depends(get_curr
                 ).delete()
 
         new_order.subtotal = calculated_total
-        new_order.total = calculated_total + unique_code
+        new_order.total = calculated_total if is_cod else calculated_total + unique_code
 
         log = models.TransactionLog(
             user_id=user.id,
@@ -567,12 +632,24 @@ def get_order_history(username: str = Depends(get_current_user), db: Session = D
 async def upload_payment_proof(
     order_id: str,
     file: UploadFile = File(...),
+    username: str = Depends(get_current_user),
     db: Session = Depends(database.get_db)
 ):
-    """User mengupload bukti transfer manual"""
-    order = db.query(models.Order).filter(models.Order.id == order_id).first()
-    if not order or order.status != "UNPAID":
-        raise HTTPException(status_code=400, detail="Order tidak valid atau sudah dibayar")
+    """User mengupload bukti transfer manual (TF/QRIS only)"""
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
+
+    order = db.query(models.Order).filter(
+        models.Order.id == order_id,
+        models.Order.user_id == user.id
+    ).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order tidak ditemukan")
+    if order.payment_method == 'COD':
+        raise HTTPException(status_code=400, detail="Order COD tidak memerlukan bukti pembayaran.")
+    if order.status not in ("UNPAID", "VERIFYING"):
+        raise HTTPException(status_code=400, detail="Order tidak valid atau sudah diproses")
 
     content = await read_and_validate_image(file)
 
@@ -622,6 +699,44 @@ def confirm_order_received(
     return {"message": "Pesanan dikonfirmasi diterima!", "status": "DELIVERED"}
 
 
+@app.post("/orders/{order_id}/cancel", tags=["Transaction Logic"])
+def cancel_order(
+    order_id: str,
+    username: str = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    """User membatalkan pesanan (hanya boleh jika status UNPAID atau VERIFYING)."""
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
+
+    order = db.query(models.Order).filter(
+        models.Order.id == order_id,
+        models.Order.user_id == user.id
+    ).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order tidak ditemukan")
+
+    if order.status not in ("UNPAID", "VERIFYING", "PAID"):
+        raise HTTPException(status_code=400, detail="Pesanan tidak dapat dibatalkan pada status ini.")
+
+    try:
+        order.status = "CANCELLED"
+        _return_stock_for_order(order, db)
+        db.add(models.TransactionLog(
+            user_id=user.id,
+            action="ORDER_CANCELLED",
+            details=f"Order {order_id} dibatalkan oleh user"
+        ))
+        db.commit()
+        logger.info(f"Order {order_id} dibatalkan oleh user {username}")
+        return {"message": "Pesanan berhasil dibatalkan.", "status": "CANCELLED"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Cancel order {order_id} error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Gagal membatalkan pesanan.")
+
+
 @app.get("/admin/orders", response_model=List[schemas.OrderResponse], tags=["Admin"])
 def admin_get_all_orders(_: None = Depends(verify_admin), db: Session = Depends(database.get_db)):
     """Dashboard Admin memantau seluruh transaksi"""
@@ -648,19 +763,28 @@ def admin_update_order_status(
                     models.ProductSku.id == item.sku_id
                 ).first()
                 if sku:
-                    sku.stock_reserved -= item.quantity
+                    sku.stock_reserved = max(0, sku.stock_reserved - item.quantity)
             logger.info(f"Order {order_id} diapprove oleh admin.")
 
         elif payload.status == "REJECTED" and order.status == "VERIFYING":
-            payload.status = "CANCELLED"
+            # Kembalikan stok dan biarkan user re-upload bukti (set ke UNPAID)
+            if order.payment:
+                db.delete(order.payment)
+            payload.status = "UNPAID"
+            logger.info(f"Order {order_id} ditolak admin, stok dikembalikan, user bisa re-upload.")
+
+        elif payload.status == "SHIPPED" and order.status in ("PAID",):
+            order.shipped_at = datetime.datetime.utcnow()
+            if payload.tracking_number:
+                order.tracking_number = payload.tracking_number.strip()
+            # Kurangi stock_reserved karena barang sudah benar-benar dikirim
             for item in order.items:
                 sku = db.query(models.ProductSku).filter(
                     models.ProductSku.id == item.sku_id
                 ).first()
                 if sku:
-                    sku.stock_reserved -= item.quantity
-                    sku.stock_available += item.quantity
-            logger.info(f"Order {order_id} ditolak admin, stok dikembalikan.")
+                    sku.stock_reserved = max(0, sku.stock_reserved - item.quantity)
+            logger.info(f"Order {order_id} dikirim (SHIPPED), resi: {payload.tracking_number}.")
 
         order.status = payload.status
         db.commit()
@@ -678,16 +802,30 @@ def admin_update_order_status(
         raise HTTPException(status_code=500, detail="Gagal mengupdate status order.")
 
 
-@app.put("/admin/skus/{sku_id}/stock", tags=["Admin"])
-def admin_update_sku_stock(sku_id: int, stock: int, _: None = Depends(verify_admin), db: Session = Depends(database.get_db)):
-    """Admin update stok produk secara manual"""
+@app.put("/admin/skus/{sku_id}", tags=["Admin"])
+def admin_update_sku(
+    sku_id: int, 
+    stock: Optional[int] = None, 
+    price: Optional[float] = None, 
+    color_hex: Optional[str] = None,
+    _: None = Depends(verify_admin), 
+    db: Session = Depends(database.get_db)
+):
+    """Admin update detail SKU secara manual (stok, harga, warna)"""
     sku = db.query(models.ProductSku).filter(models.ProductSku.id == sku_id).first()
     if not sku:
         raise HTTPException(status_code=404, detail="SKU tidak ditemukan")
-    sku.stock_available = stock
+    
+    if stock is not None:
+        sku.stock_available = stock
+    if price is not None:
+        sku.price = price
+    if color_hex is not None:
+        sku.color_hex = color_hex if color_hex != 'null' else None
+
     db.commit()
-    logger.info(f"Stok SKU {sku_id} diupdate ke {stock} oleh admin.")
-    return {"status": "success", "new_stock": stock}
+    logger.info(f"SKU {sku_id} diupdate oleh admin: Stok={stock}, Harga={price}, Warna={color_hex}")
+    return {"status": "success", "sku_id": sku_id}
 
 
 @app.post("/admin/products/{product_id}/image", tags=["Admin"])
@@ -752,6 +890,14 @@ def admin_update_product(
         product.description = payload.description
     if payload.category is not None:
         product.category = payload.category
+    if payload.specification is not None:
+        product.specification = payload.specification
+    
+    if payload.colors is not None:
+        # Ganti semua warna yang ada dengan list yang baru
+        db.query(models.ProductColor).filter(models.ProductColor.product_id == product_id).delete()
+        for c in payload.colors:
+            db.add(models.ProductColor(product_id=product_id, color_hex=c.color_hex))
 
     db.commit()
     db.refresh(product)
@@ -774,6 +920,7 @@ def admin_add_sku(
     new_sku = models.ProductSku(
         product_id=product_id,
         variant_name=payload.variant_name,
+        color_hex=payload.color_hex,
         price=payload.price,
         stock_available=payload.stock_available,
         stock_reserved=payload.stock_reserved,
@@ -818,6 +965,41 @@ def admin_get_users(_: None = Depends(verify_admin), db: Session = Depends(datab
             "total_spent": spent,
         })
     return result
+
+
+@app.delete("/admin/orders/{order_id}", tags=["Admin"])
+def admin_delete_order(order_id: str, _: None = Depends(verify_admin), db: Session = Depends(database.get_db)):
+    """Admin hapus pesanan beserta relasinya"""
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order tidak ditemukan")
+    db.delete(order)
+    db.commit()
+    logger.info(f"Order {order_id} dihapus oleh admin.")
+    return {"status": "deleted"}
+
+
+@app.delete("/admin/users/{user_id}", tags=["Admin"])
+def admin_delete_user(user_id: int, _: None = Depends(verify_admin), db: Session = Depends(database.get_db)):
+    """Admin hapus pengguna beserta relasinya"""
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
+    
+    db.query(models.Cart).filter(models.Cart.user_id == user_id).delete()
+    db.query(models.Favorite).filter(models.Favorite.user_id == user_id).delete()
+    db.query(models.Address).filter(models.Address.user_id == user_id).delete()
+    db.query(models.Review).filter(models.Review.user_id == user_id).delete()
+    db.query(models.TransactionLog).filter(models.TransactionLog.user_id == user_id).delete()
+    
+    orders = db.query(models.Order).filter(models.Order.user_id == user_id).all()
+    for o in orders:
+        db.delete(o)
+        
+    db.delete(user)
+    db.commit()
+    logger.info(f"User {user_id} dihapus oleh admin.")
+    return {"status": "deleted"}
 
 
 # ---------------------------------------------------------------------------
@@ -1157,3 +1339,88 @@ async def update_profile(
 def get_promos(db: Session = Depends(database.get_db)):
     """Mendapatkan daftar promo banner home."""
     return db.query(models.PromoBanner).filter(models.PromoBanner.is_active == True).all()
+
+# ---------------------------------------------------------------------------
+# Payment Config (info TF & QRIS, bisa diedit lewat admin panel)
+# ---------------------------------------------------------------------------
+@app.get("/payment-config", tags=["Payment Config"])
+def get_payment_config(db: Session = Depends(database.get_db)):
+    """Kembalikan semua setting pembayaran sebagai dict key→value."""
+    rows = db.query(models.SiteSetting).all()
+    return {r.key: r.value for r in rows}
+
+@app.put("/admin/payment-config", tags=["Payment Config"])
+def update_payment_config(
+    payload: dict,
+    db: Session = Depends(database.get_db),
+    _: None = Depends(verify_admin),
+):
+    """Update info bank TF (tf_bank_name, tf_account_number, tf_account_holder)."""
+    allowed = {"tf_bank_name", "tf_account_number", "tf_account_holder"}
+    for key, value in payload.items():
+        if key not in allowed:
+            continue
+        row = db.get(models.SiteSetting, key)
+        if row:
+            row.value = str(value)
+        else:
+            db.add(models.SiteSetting(key=key, value=str(value)))
+    db.commit()
+    return {"message": "Payment config berhasil diperbarui"}
+
+@app.post("/admin/payment-config/qris", tags=["Payment Config"])
+async def upload_qris_image(
+    file: UploadFile = File(...),
+    db: Session = Depends(database.get_db),
+    _: None = Depends(verify_admin),
+):
+    """Upload gambar QRIS baru. Menggantikan file lama."""
+    content = await read_and_validate_image(file)
+    filename = f"qris_{uuid.uuid4().hex[:8]}.png"
+    dest = os.path.join("uploads", filename)
+    with open(dest, "wb") as f:
+        f.write(content)
+    # Update database record
+    row = db.get(models.SiteSetting, "qris_image")
+    if row:
+        # Hapus file lama jika ada
+        if row.value:
+            old_filename = row.value.replace("/uploads/", "")
+            old_path = os.path.join("uploads", old_filename)
+            if os.path.exists(old_path):
+                try: os.remove(old_path)
+                except Exception: pass
+        row.value = f"/uploads/{filename}"
+    else:
+        db.add(models.SiteSetting(key="qris_image", value=f"/uploads/{filename}"))
+    db.commit()
+    return {"message": "QRIS berhasil diupload", "url": f"/uploads/{filename}"}
+
+# --- GALLERY & SPECS ---
+@app.post("/admin/products/{product_id}/gallery", tags=["Products"])
+async def upload_product_gallery(
+    product_id: int,
+    files: List[UploadFile] = File(...),
+    db: Session = Depends(database.get_db),
+    _: None = Depends(verify_admin),
+):
+    """Upload multiple gambar ke galeri produk."""
+    urls = []
+    for file in files:
+        content = await read_and_validate_image(file)
+        filename = f"gallery_{uuid.uuid4().hex[:8]}.png"
+        dest = os.path.join("uploads", filename)
+        with open(dest, "wb") as f:
+            f.write(content)
+        
+        url = f"/uploads/{filename}"
+        db.add(models.ProductImage(product_id=product_id, image_url=url))
+        urls.append(url)
+    
+    db.commit()
+    return {"message": f"{len(urls)} foto ditambahkan ke galeri", "urls": urls}
+
+@app.get("/admin/all-products", tags=["Products"])
+def get_all_products_admin(db: Session = Depends(database.get_db), _: None = Depends(verify_admin)):
+    """Versi detil product untuk kebutuhan admin."""
+    return db.query(models.Product).all()

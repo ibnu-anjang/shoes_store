@@ -39,12 +39,16 @@ class OrderProvider extends ChangeNotifier {
     required List<CartItem> items,
     required String address,
     required String phone,
+    String paymentMethod = 'TF',
   }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
     try {
-      final order = await ApiService.checkoutRemote(items, address, phone);
+      final order = await ApiService.checkoutRemote(
+        items, address, phone,
+        paymentMethod: paymentMethod,
+      );
       await loadOrders();
       return order;
     } catch (e) {
@@ -61,6 +65,8 @@ class OrderProvider extends ChangeNotifier {
     _error = null;
     String statusStr;
     switch (newStatus) {
+      case OrderStatus.unpaid:
+        statusStr = 'UNPAID';
       case OrderStatus.menungguVerifikasi:
         statusStr = 'VERIFYING';
       case OrderStatus.diproses:
@@ -79,6 +85,19 @@ class OrderProvider extends ChangeNotifier {
     } catch (e) {
       _error = "Gagal update status";
       debugPrint("Error updating order status: $e");
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> cancelOrder(String orderId) async {
+    _error = null;
+    try {
+      await ApiService.cancelOrder(orderId);
+      await loadOrders();
+    } catch (e) {
+      _error = "Gagal membatalkan pesanan";
+      debugPrint("Error cancelling order: $e");
       notifyListeners();
       rethrow;
     }
@@ -103,7 +122,7 @@ class OrderProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  static OrderProvider of(BuildContext context, {bool listen = true}) {
+  static OrderProvider of(BuildContext context, {bool listen = false}) {
     return Provider.of<OrderProvider>(context, listen: listen);
   }
 }

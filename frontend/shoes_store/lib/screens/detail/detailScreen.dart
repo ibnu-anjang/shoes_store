@@ -17,19 +17,35 @@ class DetailScreen extends StatefulWidget {
 
 class _DetailScreenState extends State<DetailScreen> {
   int currentImage = 0;
-  int currentColor = 1;
-  int currentSize = 0;
+  int currentColor = 0;
+  int? currentSizeIndex; // null means no selection yet
+
+  List<ProductSku> get filteredSkus {
+    if (widget.product.colors.isEmpty) return widget.product.skus;
+    final selectedColorHex = colorToHex(widget.product.colors[currentColor]);
+    return widget.product.skus.where((sku) {
+      return sku.colorHex == null || sku.colorHex == selectedColorHex;
+    }).toList();
+  }
+
+  ProductSku? get selectedSku {
+    final list = filteredSkus;
+    if (currentSizeIndex != null && currentSizeIndex! < list.length) {
+      return list[currentSizeIndex!];
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kcontentColor,
-      floatingActionButton: widget.product.skus.isNotEmpty 
+      floatingActionButton: selectedSku != null 
         ? AddToCart(
             product: widget.product,
-            selectedSku: widget.product.skus[currentSize],
+            selectedSku: selectedSku!,
             selectedColor: widget.product.colors.isNotEmpty
-                ? widget.product.colors[currentColor < widget.product.colors.length ? currentColor : 0]
+                ? widget.product.colors[currentColor]
                 : Colors.black,
           )
         : null,
@@ -43,7 +59,7 @@ class _DetailScreenState extends State<DetailScreen> {
                 child: Column(
                   children: [
                     MyImageSlider(
-                      image: widget.product.image,
+                      images: widget.product.gallery,
                       onChange: (index) {
                         setState(() {
                           currentImage = index;
@@ -53,11 +69,11 @@ class _DetailScreenState extends State<DetailScreen> {
 
                     const SizedBox(height: 10),
                     // Hanya tampilkan dots jika ada lebih dari 1 gambar (dinamis)
-                    if (1 > 1) 
+                    if (widget.product.gallery.length > 1) 
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: List.generate(
-                        1,
+                        widget.product.gallery.length,
                         (index) => AnimatedContainer(
                           duration: const Duration(milliseconds: 300),
                           width: currentImage == index ? 15 : 8,
@@ -90,9 +106,7 @@ class _DetailScreenState extends State<DetailScreen> {
                         children: [
                           ItemDetails(
                             product: widget.product,
-                            selectedSku: widget.product.skus.isNotEmpty
-                                ? widget.product.skus[currentSize]
-                                : null,
+                            selectedSku: selectedSku,
                           ),
                           const SizedBox(height: 20),
                           const Text(
@@ -112,6 +126,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                 onTap: () {
                                   setState(() {
                                     currentColor = index;
+                                    currentSizeIndex = null; // Reset size selection on color change
                                   });
                                 },
                                 child: AnimatedContainer(
@@ -154,11 +169,11 @@ class _DetailScreenState extends State<DetailScreen> {
                           Wrap(
                             spacing: 10,
                             children: List.generate(
-                              widget.product.skus.length,
+                              filteredSkus.length,
                               (index) => GestureDetector(
                                 onTap: () {
                                   setState(() {
-                                    currentSize = index;
+                                    currentSizeIndex = index;
                                   });
                                 },
                                 child: AnimatedContainer(
@@ -166,11 +181,11 @@ class _DetailScreenState extends State<DetailScreen> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 20, vertical: 10),
                                   decoration: BoxDecoration(
-                                    color: currentSize == index
+                                    color: currentSizeIndex == index
                                         ? kprimaryColor
                                         : Colors.grey.shade300,
                                     borderRadius: BorderRadius.circular(20),
-                                    boxShadow: currentSize == index
+                                    boxShadow: currentSizeIndex == index
                                         ? [
                                             BoxShadow(
                                               color: kprimaryColor.withOpacity(0.4),
@@ -181,9 +196,9 @@ class _DetailScreenState extends State<DetailScreen> {
                                         : [],
                                   ),
                                   child: Text(
-                                    widget.product.skus[index].variantName,
+                                    filteredSkus[index].variantName,
                                     style: TextStyle(
-                                      color: currentSize == index
+                                      color: currentSizeIndex == index
                                           ? Colors.white
                                           : Colors.black,
                                       fontWeight: FontWeight.bold,

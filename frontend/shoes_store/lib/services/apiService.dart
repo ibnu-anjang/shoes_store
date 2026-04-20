@@ -89,13 +89,17 @@ class ApiService {
 
   // --- REMOTE CART API (New with Shopee Logic) ---
 
-  static Future<void> addToCart(int skuId, int quantity) async {
+  static Future<void> addToCart(int skuId, int quantity, {String? colorHex}) async {
     try {
       final headers = await _authHeaders();
       final response = await http.post(
         Uri.parse('$_baseUrl/cart'),
         headers: headers,
-        body: jsonEncode({'sku_id': skuId, 'quantity': quantity}),
+        body: jsonEncode({
+          'sku_id': skuId, 
+          'quantity': quantity,
+          if (colorHex != null) 'color_hex': colorHex,
+        }),
       );
       if (response.statusCode != 200) {
         throw Exception(jsonDecode(response.body)['detail']);
@@ -164,14 +168,14 @@ class ApiService {
   static Order _parseOrderFromJson(Map<String, dynamic> json) {
     OrderStatus status;
     switch (json['status']) {
-      case 'UNPAID': status = OrderStatus.menungguVerifikasi; break;
+      case 'UNPAID': status = OrderStatus.unpaid; break;
       case 'VERIFYING': status = OrderStatus.menungguVerifikasi; break;
       case 'PAID': status = OrderStatus.diproses; break;
       case 'SHIPPED': status = OrderStatus.dalamPengiriman; break;
       case 'DELIVERED': status = OrderStatus.diterima; break;
       case 'COMPLETED': status = OrderStatus.diterima; break;
       case 'CANCELLED': status = OrderStatus.dibatalkan; break;
-      default: status = OrderStatus.menungguVerifikasi;
+      default: status = OrderStatus.unpaid;
     }
 
     final reviewedIds = (json['reviewed_item_ids'] as List?)
@@ -197,7 +201,9 @@ class ApiService {
             variantName: itemJson['variant_name'] ?? '',
             price: (itemJson['price_at_checkout'] as num).toDouble(),
             stockAvailable: 0,
+            colorHex: itemJson['color_hex'],
           )],
+          gallery: [],
           category: '',
           rate: 4.8,
           quantity: 1,
@@ -206,6 +212,7 @@ class ApiService {
           id: orderItemId,
           product: product,
           sku: product.skus.first,
+          color: itemJson['color_hex'] != null ? hexToColor(itemJson['color_hex']) : null,
           quantity: itemJson['quantity'] ?? 1,
           isReviewed: orderItemId != null && reviewedIds.contains(orderItemId),
         ));
@@ -230,6 +237,8 @@ class ApiService {
       nomorWA: json['phone'] ?? '-',
       tanggal: DateTime.tryParse(json['tanggal'].toString()) ?? DateTime.now(),
       hasPaymentProof: json['payment'] != null,
+      paymentMethod: json['payment_method'] as String?,
+      resi: json['tracking_number'] as String?,
     );
   }
 
@@ -279,7 +288,12 @@ class ApiService {
     throw Exception(jsonDecode(responseBody)['detail'] ?? 'Gagal upload foto profil');
   }
 
-  static Future<Order> checkoutRemote(List<CartItem> items, String address, String phone) async {
+  static Future<Order> checkoutRemote(
+    List<CartItem> items,
+    String address,
+    String phone, {
+    String paymentMethod = 'TF',
+  }) async {
     try {
       final headers = await _authHeaders();
       final response = await http.post(
@@ -288,9 +302,11 @@ class ApiService {
         body: jsonEncode({
           'address': address,
           'phone': phone,
+          'payment_method': paymentMethod,
           'items': items.map((e) => {
             'sku_id': e.sku.id,
             'quantity': e.quantity,
+            'color_hex': colorToHex(e.selectedColor),
           }).toList(),
         }),
       );
@@ -342,14 +358,33 @@ class ApiService {
 
   static Future<void> uploadPayment(String orderId, File image) async {
     try {
+      final headers = await _authHeaders(isJson: false);
       var request = http.MultipartRequest('POST', Uri.parse('$_baseUrl/orders/$orderId/pay'));
+      headers.forEach((k, v) => request.headers[k] = v);
       request.files.add(await http.MultipartFile.fromPath('file', image.path));
       var response = await request.send();
       if (response.statusCode != 200) {
-        throw Exception("Gagal upload bukti!");
+        final body = await response.stream.bytesToString();
+        throw Exception(jsonDecode(body)['detail'] ?? "Gagal upload bukti!");
       }
     } catch (e) {
       rethrow;
+    }
+  }
+
+  static Future<void> cancelOrder(String orderId) async {
+    final headers = await _authHeaders(isJson: false);
+    final response = await http
+        .post(Uri.parse('$_baseUrl/orders/$orderId/cancel'), headers: headers)
+        .timeout(const Duration(seconds: 15));
+    if (response.statusCode != 200) {
+      String detail;
+      try {
+        detail = jsonDecode(response.body)['detail'] ?? 'Gagal membatalkan pesanan';
+      } catch (_) {
+        detail = 'Gagal membatalkan pesanan (server error ${response.statusCode})';
+      }
+      throw Exception(detail);
     }
   }
 
@@ -495,5 +530,23 @@ class ApiService {
       debugPrint("Error loading promos: $e");
     }
     return [];
+  }
+
+  static Future<Map<String, String>> getPaymentConfig() async {
+    try {
+      final response = await http.get(Uri.parse('$_baseUrl/payment-config'));
+      if (response.statusCode == 200) {
+        final raw = jsonDecode(response.body) as Map<String, dynamic>;
+        return raw.map((k, v) => MapEntry(k, v?.toString() ?? ''));
+      }
+    } catch (e) {
+      debugPrint("Error loading payment config: $e");
+    }
+    return {
+      'tf_bank_name':      'BCA (Modern Shoes Store)',
+      'tf_account_number': '7712 8890 1234',
+      'tf_account_holder': 'PT Shoes Store Modern',
+      'qris_image':        '',
+    };
   }
 }

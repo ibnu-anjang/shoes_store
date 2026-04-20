@@ -79,7 +79,10 @@ class _CartScreenState extends State<CartScreen> {
 
             // LIST ITEMS
             Expanded(
-              child: cartItems.isEmpty
+              child: RefreshIndicator(
+                onRefresh: _loadData,
+                color: kprimaryColor,
+                child: cartItems.isEmpty
                   ? (provider.isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : Center(
@@ -183,12 +186,28 @@ class _CartScreenState extends State<CartScreen> {
                                       // Mode normal: tampil size biasa
                                       // Mode edit: tampil dropdown ganti ukuran
                                       if (!_isEditing)
-                                        Text(
-                                          cartItem.selectedSize,
-                                          style: TextStyle(
-                                            color: Colors.grey.shade600,
-                                            fontSize: 11,
-                                          ),
+                                        Row(
+                                          children: [
+                                            Text(
+                                              cartItem.selectedSize,
+                                              style: TextStyle(
+                                                color: Colors.grey.shade600,
+                                                fontSize: 11,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            const Text("|", style: TextStyle(color: Colors.grey, fontSize: 11)),
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              width: 12,
+                                              height: 12,
+                                              decoration: BoxDecoration(
+                                                color: cartItem.selectedColor,
+                                                shape: BoxShape.circle,
+                                                border: Border.all(color: Colors.grey.shade300, width: 0.5),
+                                              ),
+                                            ),
+                                          ],
                                         )
                                       else
                                         _buildSizeDropdown(context, index, cartItem, provider),
@@ -261,6 +280,7 @@ class _CartScreenState extends State<CartScreen> {
                         );
                       },
                     ),
+              ),
             ),
 
             // CHECKOUT FOOTER

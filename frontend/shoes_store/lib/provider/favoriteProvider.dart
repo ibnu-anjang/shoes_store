@@ -70,7 +70,7 @@ class FavoriteProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  static FavoriteProvider of(BuildContext context, {bool listen = true}) {
+  static FavoriteProvider of(BuildContext context, {bool listen = false}) {
     return Provider.of<FavoriteProvider>(context, listen: listen);
   }
 }
