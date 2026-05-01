@@ -1,56 +1,55 @@
 # Shoes Store
 
-Full-stack e-commerce mobile app khusus sepatu dengan sistem pembayaran manual, manajemen stok, dan AI chatbot lokal.
+A full-stack mobile e-commerce app for footwear, featuring manual payment verification, stock management, and a local AI chatbot — built with Flutter and FastAPI.
+
+![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.128-009688?logo=fastapi)
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python)
+![MariaDB](https://img.shields.io/badge/MariaDB-10.11-003545?logo=mariadb)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker)
 
 ---
+
+## Features
+
+- Register & Login
+- Product browsing with category filter and server-side search
+- Multi-variant products: size (SKU) & color
+- Cart & Checkout
+- Manual payment proof upload
+- Full order lifecycle: `UNPAID → VERIFYING → PAID → SHIPPED → COMPLETED`
+- Auto-cancel orders after 24 hours without payment
+- Product reviews with auto-recalculated ratings
+- Favorites & address management
+- AI Chatbot "SoleMate" powered by Ollama (local, no API key needed)
+- Web-based Admin Panel at `/management`
+- Promo banners
 
 ## Tech Stack
 
-| Layer | Teknologi |
+| Layer | Technology |
 |---|---|
-| Mobile Frontend | Flutter 3.x + Provider |
-| Backend API | FastAPI + SQLAlchemy (Python 3.11) |
+| Mobile | Flutter 3.x + Provider |
+| Backend | FastAPI + SQLAlchemy (Python 3.11) |
 | Database | MariaDB 10.11 |
-| AI Chatbot | Ollama (`qwen2.5:1.5b`) — lokal, tanpa API key |
+| AI Chatbot | Ollama (`qwen2.5:1.5b`) — runs locally |
 | Infrastructure | Docker Compose |
 | Public Access | Cloudflare Tunnel |
-| File Storage | Local (`backend/uploads/`) |
 
----
-
-## Fitur Utama
-
-- Autentikasi (Register & Login)
-- Browse produk dengan filter kategori & pencarian server-side
-- Produk multi-variant: ukuran (SKU) & warna
-- Cart & Checkout
-- Upload bukti pembayaran manual
-- Order lifecycle penuh: `UNPAID → VERIFYING → PAID → SHIPPED → COMPLETED`
-- Auto-cancel order setelah 24 jam tanpa pembayaran
-- Review produk per item (dengan auto-recalculate rating)
-- Favorit & Manajemen Alamat
-- AI Chatbot "SoleMate" berbasis Ollama — bisa jawab pertanyaan stok & produk
-- Admin Panel web-based (`/management`)
-- Promo Banner
-
----
-
-## Prasyarat
+## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) & Docker Compose
-- [Ollama](https://ollama.com/) (untuk AI Chatbot)
-- Flutter SDK 3.x (untuk build APK)
+- [Ollama](https://ollama.com/) (for AI Chatbot)
+- Flutter SDK 3.x (to build APK)
 
----
+## Getting Started
 
-## Cara Menjalankan
-
-### 1. Setup Environment
+### 1. Configure environment
 
 ```bash
 cd backend
 cp .env.example .env
-# Edit .env: isi ADMIN_SECRET_KEY dengan key rahasia kamu
+# Edit .env: set ADMIN_SECRET_KEY to your own secret
 ```
 
 ### 2. Setup Ollama (AI Chatbot)
@@ -60,10 +59,9 @@ ollama pull qwen2.5:1.5b
 sudo systemctl enable --now ollama
 ```
 
-### 3. Jalankan Sistem
+### 3. Run the stack
 
 ```bash
-# Dari root project
 docker compose up -d
 ```
 
@@ -71,89 +69,70 @@ docker compose up -d
 |---|---|
 | Backend API | http://localhost:8000 |
 | Admin Panel | http://localhost:8000/management |
-| API Docs (Swagger) | http://localhost:8000/docs |
+| Swagger Docs | http://localhost:8000/docs |
 | phpMyAdmin | http://localhost:8080 |
 
-### 4. Isi Data Awal (opsional)
+### 4. Seed initial data (optional)
 
 ```bash
 docker exec my_uvicorn_app python seed_orm.py
 ```
 
----
-
-## Konfigurasi Cloudflare Tunnel (Akses Publik)
-
-1. Buka [Cloudflare Zero Trust Dashboard](https://one.dash.cloudflare.com/) → buat Tunnel baru → salin token
-2. Ganti token di `docker-compose.yml` bagian service `tunnel`
-3. Update `_kCloudflareHost` di `frontend/shoes_store/lib/constant.dart` dengan domain kamu
-4. Build ulang APK
-
----
-
-## Struktur Proyek
+## Project Structure
 
 ```
 shoes_store/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py          # FastAPI routes
-│   │   ├── models.py        # SQLAlchemy models
-│   │   ├── schemas.py       # Pydantic schemas
-│   │   ├── database.py      # DB connection
-│   │   └── ollama_service.py # AI Chatbot service
-│   ├── admin_panel/         # Web admin panel
-│   ├── uploads/             # File upload storage (gitignored)
-│   ├── seed_orm.py          # Seed data
+│   │   ├── main.py            # FastAPI routes
+│   │   ├── models.py          # SQLAlchemy models
+│   │   ├── schemas.py         # Pydantic schemas
+│   │   ├── database.py        # DB connection
+│   │   └── ollama_service.py  # AI Chatbot service
+│   ├── admin_panel/           # Web-based admin panel
+│   ├── uploads/               # User-uploaded files (gitignored)
+│   ├── seed_orm.py
 │   ├── Dockerfile
 │   └── .env.example
 ├── frontend/
-│   └── shoes_store/         # Flutter app
+│   └── shoes_store/           # Flutter app
 │       └── lib/
 │           ├── screens/
 │           ├── provider/
 │           ├── services/
 │           ├── models/
 │           └── constant.dart
-├── docs/
-│   ├── PRD.md
-│   └── handover_tutorial.md
 └── docker-compose.yml
 ```
-
----
 
 ## Order Lifecycle
 
 ```
-UNPAID ──(upload bukti)──► VERIFYING ──(admin approve)──► PAID
+UNPAID ──(upload proof)──► VERIFYING ──(admin approve)──► PAID
    │                                                        │
-(> 24 jam)                                          (admin proses)
+(> 24h)                                             (admin ships)
    │                                                        │
    ▼                                                        ▼
-CANCELLED                                    SHIPPED ──(konfirmasi)──► COMPLETED
+CANCELLED                                    SHIPPED ──(confirm)──► COMPLETED
 ```
 
-**Logika Stok:**
-- Checkout → stok di-*reserve*
-- Admin approve → stok dikurangi permanent
-- Cancel / Reject → stok dikembalikan
+**Stock logic:**
+- Checkout → stock reserved
+- Admin approves → stock permanently deducted
+- Cancel / Reject → stock restored
 
----
+## Cloudflare Tunnel (Public Access)
 
-## Spesifikasi Minimum (Server/Laptop)
+1. Go to [Cloudflare Zero Trust Dashboard](https://one.dash.cloudflare.com/) → create a new Tunnel → copy the token
+2. Replace the token in `docker-compose.yml` under the `tunnel` service
+3. Update `_kCloudflareHost` in `frontend/shoes_store/lib/constant.dart` with your domain
+4. Rebuild the APK
 
-| Komponen | Minimum |
+## Minimum Requirements
+
+| Component | Minimum |
 |---|---|
-| RAM | 4 GB (8 GB direkomendasikan untuk Ollama) |
+| RAM | 4 GB (8 GB recommended for Ollama) |
 | CPU | Dual-core |
-| Storage | 5 GB free (Docker images + DB + uploads) |
-| OS | Linux / macOS / Windows (dengan WSL2 untuk Docker) |
-
----
-
-## Dokumentasi Lengkap
-
-Lihat folder `docs/` untuk:
-- `PRD.md` — Product Requirements Document
-- `handover_tutorial.md` — Panduan operasional & catatan pengembangan selanjutnya
+| Storage | 5 GB free |
+| OS | Linux / macOS / Windows (WSL2 for Docker) |
