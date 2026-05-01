@@ -84,6 +84,16 @@ CLAUDE.md
 .cursor/
 
 # ─────────────────────────────────────────
+# Personal notes & internal docs
+# ─────────────────────────────────────────
+catatan/
+docs/
+CLOUDFLARE_TUNNEL_ANALYSIS.md
+OLLAMA_SETUP.md
+PANDUAN_AI_LOKAL_BUILD_APK.md
+TROUBLESHOOT_WINDOWS_RELEASE_BUILD.md
+
+# ─────────────────────────────────────────
 # Separate projects (not part of this repo)
 # ─────────────────────────────────────────
 ujian_template_pro/
