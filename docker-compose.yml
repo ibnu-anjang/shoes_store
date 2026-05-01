@@ -1,0 +1,70 @@
+# Dokumen Docker Compose - Shoes Store Proyek
+
+services:
+  db:
+    image: mariadb:10.11
+    container_name: shoes_store_db
+    restart: "no"
+    environment:
+      # Mengizinkan login root tanpa password (sesuai settingan di database.py)
+      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: 'yes'
+      # Otomatis membuat database saat pertama kali jalan
+      MARIADB_DATABASE: 'db_shoes_store'
+    ports:
+      # Port mapping: host_port:container_port
+      - '3306:3306'
+    volumes:
+      # Menyimpan data database agar tidak hilang saat container dimatikan
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      # Cek apakah MariaDB sudah benar-benar siap menerima koneksi
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  app:
+    build: ./backend
+    container_name: my_uvicorn_app
+    restart: "no"
+    expose:
+      - "8000"
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    depends_on:
+      db:
+        # Backend hanya start SETELAH MariaDB healthy (bukan sekedar container jalan)
+        condition: service_healthy
+    volumes:
+      # Persisting uploaded files (bukti bayar, foto profil, review) ke host
+      # agar tidak hilang saat container di-rebuild
+      - ./backend/uploads:/app/uploads
+
+  # Service 2: Cloudflare Tunnel
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared_connector
+    restart: "no"
+    # GANTI KODE DI BAWAH DENGAN TOKEN ASLI DARI DASHBOARD
+    command: tunnel --no-autoupdate run --token eyJhIjoiZDdjNDk2ZjlmOTEyODk5N2ZjOWYzNDI5Mzg2MWM0MzUiLCJ0IjoiYWUyMDQ1YmEtYjRmZS00YjQwLWEyYjktYzhlZDI4OGM4Y2Y5IiwicyI6Ik1XUTVOemxrT1RndE1ETTBNeTAwTmpGa0xUaGxZVGt0TldKbFpURTFObVE1TW1JMCJ9
+    depends_on:
+      - app
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: shoes_store_pma
+    restart: "no"
+    ports:
+      - '8080:80'
+    environment:
+      PMA_HOST: db
+      PMA_USER: root
+      PMA_PASSWORD: ''
+    depends_on:
+      - db
+
+volumes:
+  mariadb_data:

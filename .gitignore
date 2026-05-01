@@ -1,0 +1,89 @@
+# ─────────────────────────────────────────
+# Flutter / Dart
+# ─────────────────────────────────────────
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+**/android/**/build/
+**/ios/.generated/
+**/ios/Pods/
+**/*.jks
+**/*.keystore
+*.g.dart
+*.freezed.dart
+
+# ─────────────────────────────────────────
+# Python / FastAPI
+# ─────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+venv/
+env/
+.venv/
+backend/venv/
+*.egg-info/
+dist/
+.eggs/
+
+# Environment variables (NEVER commit secrets)
+.env
+.env.*
+!.env.example
+
+# ─────────────────────────────────────────
+# Database & logs
+# ─────────────────────────────────────────
+*.sqlite
+*.sqlite3
+*.db
+*.log
+logs/
+*.pid
+
+# ─────────────────────────────────────────
+# User uploaded files
+# ─────────────────────────────────────────
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# ─────────────────────────────────────────
+# Docker
+# ─────────────────────────────────────────
+docker-compose.override.yml
+
+# ─────────────────────────────────────────
+# IDEs & editors
+# ─────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─────────────────────────────────────────
+# AI / Claude Code (local config only)
+# ─────────────────────────────────────────
+CLAUDE.md
+.mcp.json
+.continue/
+.cursor/
+
+# ─────────────────────────────────────────
+# Separate projects (not part of this repo)
+# ─────────────────────────────────────────
+ujian_template_pro/

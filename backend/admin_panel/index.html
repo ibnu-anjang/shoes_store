@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shoes Store — Admin Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = { darkMode: 'class', theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } } }
+    </script>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="dark bg-gray-950 text-gray-100 min-h-screen">
+
+    <!-- ═══════════════════════════════════════════
+     TOAST
+═══════════════════════════════════════════ -->
+    <div id="toast"
+        class="fixed top-5 right-5 z-[100] opacity-0 pointer-events-none transition-all duration-300 translate-y-[-12px]">
+        <div id="toast-inner"
+            class="px-5 py-3 rounded-xl shadow-2xl text-sm font-semibold text-white flex items-center gap-2 min-w-[220px]">
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+     CONFIRM MODAL
+═══════════════════════════════════════════ -->
+    <div id="confirm-modal" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div class="bg-gray-800 rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 fade-in border border-gray-700">
+            <h3 id="confirm-title" class="text-base font-bold mb-1.5">Konfirmasi</h3>
+            <p id="confirm-msg" class="text-gray-400 text-sm mb-5">Yakin?</p>
+            <div class="flex gap-3 justify-end">
+                <button onclick="closeConfirm()"
+                    class="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm font-semibold">Batal</button>
+                <button id="confirm-ok"
+                    class="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-400 text-sm font-bold">Lanjutkan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+     IMAGE PREVIEW LIGHTBOX
+═══════════════════════════════════════════ -->
+    <div id="img-preview-overlay" class="fixed inset-0 z-[200] hidden items-center justify-center bg-black/90 backdrop-blur-md" onclick="closeImgPreview()">
+        <button class="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-xl font-bold transition">&times;</button>
+        <img id="img-preview-src" src="" alt="Preview" class="max-w-[90vw] max-h-[90vh] rounded-2xl shadow-2xl border border-white/10 object-contain select-none">
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+     PHOTO MODAL
+═══════════════════════════════════════════ -->
+    <div id="photo-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div class="bg-gray-800 rounded-2xl shadow-2xl p-6 w-full max-w-xl mx-4 fade-in border border-gray-700 max-h-[90vh] flex flex-col">
+            <h3 class="text-base font-bold mb-1">Manajemen Foto Terpusat</h3>
+            <p id="photo-product-name" class="text-orange-400 font-semibold mb-4 text-sm"></p>
+
+            <label class="block w-full cursor-pointer mb-4 shrink-0">
+                <div
+                    class="flex items-center justify-center gap-2 border-2 border-dashed border-gray-600 rounded-xl p-6 hover:border-orange-500 transition text-gray-400 hover:text-orange-400 bg-gray-900/40">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span class="text-sm font-medium">Pilih Beberapa Foto Sekaligus</span>
+                </div>
+                <input type="file" id="photo-file-input" accept="image/*" multiple class="hidden"
+                    onchange="previewPhotoQueue(this)">
+            </label>
+
+            <!-- Daftar Foto Lama (Hanya terlihat jika ada) -->
+            <div id="photo-existing-container" class="space-y-2 mb-4 bg-gray-900/30 p-3 rounded-xl border border-gray-700 empty:hidden max-h-40 overflow-y-auto">
+            </div>
+
+            <!-- Daftar Peran Foto Baru -->
+            <div id="photo-queue-container" class="flex-1 overflow-y-auto space-y-2 mb-4 bg-gray-900/30 p-3 rounded-xl border border-gray-700 empty:hidden max-h-40">
+                <!-- Color-specific file inputs generated dynamically -->
+            </div>
+
+            <div class="flex gap-3 justify-end mt-4 pt-4 border-t border-gray-700 shrink-0">
+                <button onclick="closePhotoModal()"
+                    class="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm font-semibold">Batal</button>
+                <button onclick="submitPhotoQueue()" id="photo-submit-btn"
+                    class="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-400 text-sm font-bold disabled:opacity-40"
+                    disabled>Simpan Perubahan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+     EDIT PRODUCT MODAL
+═══════════════════════════════════════════ -->
+    <div id="edit-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div
+            class="bg-gray-800 rounded-2xl shadow-2xl p-6 w-full max-w-lg mx-4 fade-in border border-gray-700 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-5">
+                <h3 class="text-base font-bold">Edit Produk <span id="edit-product-id-label"
+                        class="text-orange-400 font-mono text-sm"></span></h3>
+                <button onclick="closeEditModal()"
+                    class="text-gray-500 hover:text-white text-xl leading-none">&times;</button>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs font-semibold text-gray-400 uppercase block mb-1">Nama Produk</label>
+                    <input type="text" id="edit-name"
+                        class="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs font-semibold text-gray-400 uppercase block mb-1">Harga Dasar (Rp)</label>
+                        <input type="text" id="edit-price" placeholder="e.g. 190.000"
+                            class="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500">
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-gray-400 uppercase block mb-1">Kategori</label>
+                        <select id="edit-category" onchange="handleEditCategoryChange()"
+                            class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500 appearance-none cursor-pointer">
+                        </select>
+                    </div>
+                </div>
+                <div id="edit-custom-category-wrap" class="hidden">
+                    <label class="text-xs font-semibold text-gray-400 uppercase block mb-1">Nama Kategori Baru</label>
+                    <input type="text" id="edit-custom-category" placeholder="e.g. Basketball"
+                        class="w-full bg-gray-700 border border-gray-600 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs font-semibold text-gray-400 uppercase block mb-1">Deskripsi</label>
+                        <textarea id="edit-description" rows="3"
+                            class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500 resize-none"
+                            placeholder="Deskripsi produk..."></textarea>
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-gray-400 uppercase block mb-1">Spesifikasi</label>
+                        <textarea id="edit-specification" rows="3"
+                            class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500 resize-none"
+                            placeholder="Spesifikasi teknis..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Color management in edit modal -->
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="text-xs font-semibold text-gray-400 uppercase">Daftar Warna</label>
+                        <button type="button" onclick="addColorInputEdit()"
+                            class="text-xs text-orange-400 hover:text-orange-300 font-semibold">+ Tambah Warna</button>
+                    </div>
+                    <div id="edit-color-list" class="flex flex-wrap gap-2"></div>
+                </div>
+
+                <!-- SKU Management inside edit modal -->
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="text-xs font-semibold text-gray-400 uppercase">Variasi Ukuran & Stok</label>
+                        <button type="button" onclick="showAddSkuInModal()"
+                            class="text-xs text-orange-400 hover:text-orange-300 font-semibold">+ Tambah Ukuran</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="text-left border-b border-gray-800">
+                                    <th class="pb-2 text-[10px] font-bold text-gray-600 uppercase tracking-wider">Warna
+                                        / Ukuran</th>
+                                    <th class="pb-2 text-[10px] font-bold text-gray-600 uppercase tracking-wider pl-2">
+                                        Harga</th>
+                                    <th
+                                        class="pb-2 text-[10px] font-bold text-gray-600 uppercase tracking-wider pl-2 text-center">
+                                        Stok</th>
+                                    <th class="pb-2 w-10"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="edit-sku-list" class="divide-y divide-gray-800/50"></tbody>
+                        </table>
+                    </div>
+                    <!-- Add new SKU row (hidden by default) -->
+                    <div id="add-sku-in-modal" class="hidden mt-2 p-3 bg-gray-700/50 rounded-xl border border-gray-600">
+                        <p class="text-xs text-gray-400 font-semibold mb-2">Ukuran Baru</p>
+                        <div class="grid grid-cols-2 gap-2 mb-2">
+                            <input type="text" id="new-sku-name" placeholder="Size 44"
+                                class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500">
+                            <!-- Custom color picker — populated by updateSkuColorDropdownsEdit() -->
+                            <input type="hidden" id="new-sku-color" value="">
+                            <div id="new-sku-color-picker"
+                                class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 flex flex-wrap gap-1.5 items-center min-h-[34px]">
+                                <span class="text-[10px] text-gray-500 italic">—</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mb-2">
+                            <input type="text" id="new-sku-price" placeholder="Harga"
+                                class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500">
+                            <input type="number" id="new-sku-stock" placeholder="Stok" value="10"
+                                class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500 text-center">
+                        </div>
+                        <div class="flex gap-2 justify-end">
+                            <button onclick="document.getElementById('add-sku-in-modal').classList.add('hidden')"
+                                class="text-xs px-3 py-1.5 bg-gray-600 rounded-lg font-semibold hover:bg-gray-500">Batal</button>
+                            <button onclick="submitAddSkuInModal()"
+                                class="text-xs px-3 py-1.5 bg-orange-500 rounded-lg font-bold hover:bg-orange-400 text-white">Simpan</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-3 justify-end mt-5 border-t border-gray-700 pt-4">
+                <button onclick="closeEditModal()"
+                    class="px-5 py-2.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm font-semibold">Batal</button>
+                <button onclick="submitEditProduct()"
+                    class="px-5 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-400 text-sm font-bold">Simpan
+                    Perubahan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+     MAIN LAYOUT
+═══════════════════════════════════════════ -->
+    <div class="flex h-screen overflow-hidden">
+
+        <!-- SIDEBAR -->
+        <aside class="w-56 bg-gray-900 border-r border-gray-800 flex flex-col flex-shrink-0">
+            <div class="px-5 py-4 border-b border-gray-800">
+                <div class="flex items-center gap-2.5">
+                    <div
+                        class="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                        S</div>
+                    <div>
+                        <h1 class="font-bold text-white text-sm leading-tight">Shoes Store</h1>
+                        <p class="text-gray-500 text-xs">Admin Panel</p>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="flex-1 px-3 py-3 space-y-0.5">
+                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn nav-active">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                    Dashboard
+                </button>
+                <button onclick="switchTab('orders')" id="nav-orders" class="nav-btn nav-inactive">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
+                    <span>Pesanan</span>
+                    <span id="badge-verifying"
+                        class="ml-auto hidden bg-yellow-500 text-yellow-950 text-[10px] font-bold px-1.5 py-0.5 rounded-full"></span>
+                </button>
+                <button onclick="switchTab('products')" id="nav-products" class="nav-btn nav-inactive">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                    Produk & Stok
+                </button>
+                <button onclick="switchTab('users')" id="nav-users" class="nav-btn nav-inactive">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Pengguna
+                </button>
+                <button onclick="switchTab('financial')" id="nav-financial" class="nav-btn nav-inactive">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    Laporan Keuangan
+                </button>
+                <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn nav-inactive">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Pengaturan
+                </button>
+            </nav>
+
+            <div class="px-5 py-3 border-t border-gray-800 space-y-1">
+                <p class="text-[11px] text-gray-600">v3.0 Pro Edition</p>
+                <button onclick="promptAdminKey()"
+                    class="text-[11px] text-gray-600 hover:text-gray-400 transition">Ganti Admin Key</button>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="flex-1 overflow-y-auto bg-gray-950">
+
+            <!-- ═══ TAB: DASHBOARD ═══ -->
+            <div id="tab-dashboard" class="p-6 space-y-6">
+                <!-- Header -->
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Dashboard Overview</h2>
+                        <p class="text-xs text-gray-500 mt-0.5">Ringkasan performa toko</p>
+                    </div>
+                    <button onclick="refreshAll()"
+                        class="flex items-center gap-2 text-xs text-orange-400 hover:text-orange-300 font-semibold bg-gray-800 px-3 py-2 rounded-lg border border-gray-700 transition">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Refresh Data
+                    </button>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="stat-card bg-orange-900/20 border-orange-700/30">
+                        <p class="text-xs text-orange-400 font-semibold uppercase tracking-wide mb-1">Total Pendapatan
+                        </p>
+                        <p id="dash-revenue" class="text-2xl font-bold text-white">—</p>
+                        <p class="text-xs text-gray-500 mt-1">Order PAID/SHIPPED/SELESAI</p>
+                    </div>
+                    <div class="stat-card bg-blue-900/20 border-blue-700/30">
+                        <p class="text-xs text-blue-400 font-semibold uppercase tracking-wide mb-1">Total Pesanan</p>
+                        <p id="dash-total-orders" class="text-2xl font-bold text-white">—</p>
+                        <p class="text-xs text-gray-500 mt-1">Semua status</p>
+                    </div>
+                    <div class="stat-card bg-yellow-900/20 border-yellow-700/30">
+                        <p class="text-xs text-yellow-400 font-semibold uppercase tracking-wide mb-1">Perlu Verifikasi
+                        </p>
+                        <p id="dash-verifying" class="text-2xl font-bold text-yellow-400">—</p>
+                        <p class="text-xs text-gray-500 mt-1">Bukti bayar dikirim</p>
+                    </div>
+                    <div class="stat-card bg-green-900/20 border-green-700/30">
+                        <p class="text-xs text-green-400 font-semibold uppercase tracking-wide mb-1">Produk Aktif</p>
+                        <p id="dash-products" class="text-2xl font-bold text-white">—</p>
+                        <p class="text-xs text-gray-500 mt-1">Di katalog</p>
+                    </div>
+                </div>
+
+                <!-- Order Status Breakdown -->
+                <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="bg-gray-900 rounded-2xl border border-gray-800 p-4">
+                        <p class="text-xs text-gray-500 font-semibold uppercase mb-3">Status Pesanan</p>
+                        <div id="dash-status-breakdown" class="space-y-2"></div>
+                    </div>
+                    <div class="lg:col-span-2 bg-gray-900 rounded-2xl border border-gray-800 p-4">
+                        <div class="flex justify-between items-center mb-3">
+                            <p class="text-xs text-gray-500 font-semibold uppercase">Pesanan Terbaru</p>
+                            <button onclick="switchTab('orders')"
+                                class="text-xs text-orange-400 hover:text-orange-300 font-semibold">Lihat Semua
+                                →</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-gray-800">
+                                        <th class="pb-2 text-left text-xs font-semibold text-gray-500">Order ID</th>
+                                        <th class="pb-2 text-left text-xs font-semibold text-gray-500">User</th>
+                                        <th class="pb-2 text-left text-xs font-semibold text-gray-500">Total</th>
+                                        <th class="pb-2 text-left text-xs font-semibold text-gray-500">Status</th>
+                                        <th class="pb-2 text-left text-xs font-semibold text-gray-500">Tanggal</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dash-recent-orders"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Low Stock Warning -->
+                <div class="bg-gray-900 rounded-2xl border border-gray-800 p-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <p class="text-xs text-gray-500 font-semibold uppercase">⚠ Stok Menipis (≤ 5)</p>
+                        <button onclick="switchTab('products')"
+                            class="text-xs text-orange-400 hover:text-orange-300 font-semibold">Kelola Produk →</button>
+                    </div>
+                    <div id="dash-low-stock" class="space-y-1.5 text-sm text-gray-400"></div>
+                </div>
+            </div>
+
+            <!-- ═══ TAB: ORDERS ═══ -->
+            <div id="tab-orders" class="p-6 space-y-5 hidden">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Manajemen Pesanan</h2>
+                        <p class="text-xs text-gray-500 mt-0.5">Verifikasi, kirim, dan pantau pesanan pelanggan</p>
+                    </div>
+                    <button onclick="fetchOrders()"
+                        class="flex items-center gap-2 text-xs text-orange-400 hover:text-orange-300 font-semibold bg-gray-800 px-3 py-2 rounded-lg border border-gray-700">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+
+                <!-- Stats mini row -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div class="bg-gray-900 rounded-xl p-3 border border-gray-800">
+                        <p class="text-[11px] text-gray-500 font-semibold uppercase">Total</p>
+                        <p id="stat-total" class="text-xl font-bold text-white">0</p>
+                    </div>
+                    <div class="bg-yellow-900/20 rounded-xl p-3 border border-yellow-700/30">
+                        <p class="text-[11px] text-yellow-500 font-semibold uppercase">Perlu Validasi</p>
+                        <p id="stat-verifying" class="text-xl font-bold text-yellow-400">0</p>
+                    </div>
+                    <div class="bg-blue-900/20 rounded-xl p-3 border border-blue-700/30">
+                        <p class="text-[11px] text-blue-400 font-semibold uppercase">Perlu Dikirim</p>
+                        <p id="stat-paid" class="text-xl font-bold text-blue-400">0</p>
+                    </div>
+                    <div class="bg-green-900/20 rounded-xl p-3 border border-green-700/30">
+                        <p class="text-[11px] text-green-400 font-semibold uppercase">Selesai</p>
+                        <p id="stat-completed" class="text-xl font-bold text-green-400">0</p>
+                    </div>
+                </div>
+
+                <!-- Search + Filter -->
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="relative flex-1 min-w-[200px]">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <input type="text" id="orders-search" placeholder="Cari Order ID atau User ID..."
+                            oninput="renderOrders()"
+                            class="w-full bg-gray-800 border border-gray-700 rounded-xl pl-9 pr-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500">
+                    </div>
+                    <div id="status-filters" class="flex gap-1.5 flex-wrap">
+                        <button onclick="setOrderFilter('ALL')" data-filter="ALL"
+                            class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-orange-500 text-white">Semua</button>
+                        <button onclick="setOrderFilter('NEED_VALIDATION')" data-filter="NEED_VALIDATION"
+                            class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:bg-gray-700">Perlu
+                            Divalidasi</button>
+                        <button onclick="setOrderFilter('NEED_SHIPPING')" data-filter="NEED_SHIPPING"
+                            class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:bg-gray-700">Perlu
+                            Dikirim</button>
+                        <button onclick="setOrderFilter('PAID')" data-filter="PAID"
+                            class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:bg-gray-700">Dalam
+                            Proses</button>
+                        <button onclick="setOrderFilter('SHIPPED')" data-filter="SHIPPED"
+                            class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:bg-gray-700">Dikirim</button>
+                        <button onclick="setOrderFilter('COMPLETED')" data-filter="COMPLETED"
+                            class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-800 text-gray-400 hover:bg-gray-700">Selesai</button>
+                    </div>
+                </div>
+
+                <!-- Orders Table -->
+                <div class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr class="border-b border-gray-800 bg-gray-900/80">
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase w-8">
+                                    </th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Order
+                                        ID</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">User
+                                        ID</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Total
+                                    </th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status
+                                    </th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Bukti
+                                    </th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                                        Tanggal</th>
+                                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Aksi
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody id="orders-table-body">
+                                <tr>
+                                    <td colspan="8" class="px-5 py-10 text-center text-gray-600 text-sm">Memuat data...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ TAB: PRODUCTS ═══ -->
+            <div id="tab-products" class="p-6 space-y-5 hidden">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Produk & Inventori</h2>
+                        <p class="text-xs text-gray-500 mt-0.5">Kelola katalog, stok, dan harga</p>
+                    </div>
+                    <button onclick="fetchProducts()"
+                        class="flex items-center gap-2 text-xs text-orange-400 hover:text-orange-300 font-semibold bg-gray-800 px-3 py-2 rounded-lg border border-gray-700">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+
+                <!-- Add Product Form -->
+                <div class="bg-gray-900 rounded-2xl border border-gray-800 p-5">
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-6 h-6 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                            <svg class="w-3.5 h-3.5 text-orange-400" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 4v16m8-8H4" />
+                            </svg>
+                        </div>
+                        <h3 class="text-sm font-bold text-orange-400 uppercase tracking-wide">Tambah Produk Baru</h3>
+                    </div>
+
+                    <form id="add-product-form" onsubmit="submitAddProduct(event)" class="space-y-4">
+                        <!-- Row 1: name + category + price -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                                <label class="text-xs font-semibold text-gray-400 block mb-1">Nama Produk *</label>
+                                <input type="text" id="p-name" placeholder="e.g. Nike Air Max 90" required
+                                    class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500">
+                            </div>
+                            <div>
+                                <label class="text-xs font-semibold text-gray-400 block mb-1">Kategori *</label>
+                                <select id="p-category" onchange="handleAddCategoryChange()" required
+                                    class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500 appearance-none cursor-pointer">
+                                </select>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-1.5 mb-1">
+                                    <label class="text-xs font-semibold text-gray-400 block">Harga Dasar (Rp) *</label>
+                                    <div class="group relative">
+                                        <svg class="w-3.5 h-3.5 text-gray-600 cursor-help" fill="currentColor"
+                                            viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd"
+                                                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                                clip-rule="evenodd" />
+                                        </svg>
+                                        <div
+                                            class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 bg-gray-700 text-[10px] text-gray-200 p-2 rounded shadow-xl z-50">
+                                            Harga dasar adalah harga terendah yang muncul di katalog. Harga spesifik per
+                                            ukuran bisa diatur di tabel bawah.
+                                        </div>
+                                    </div>
+                                </div>
+                                <input type="text" id="p-price" placeholder="e.g. 190.000" required
+                                    oninput="syncSkuPrices()"
+                                    class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500">
+                            </div>
+                        </div>
+
+                        <!-- Custom category input (hidden) -->
+                        <div id="add-custom-category-wrap" class="hidden">
+                            <label class="text-xs font-semibold text-gray-400 block mb-1">Nama Kategori Baru</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="p-custom-category" placeholder="e.g. Basketball"
+                                    class="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500">
+                                <button type="button" onclick="saveCustomCategory()"
+                                    class="px-4 py-2.5 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 text-xs font-bold rounded-xl border border-orange-500/30">Simpan</button>
+                            </div>
+                        </div>
+
+                        <!-- Description & Specification -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-xs font-semibold text-gray-400 block mb-1">Deskripsi Produk</label>
+                                <textarea id="p-description" rows="3" placeholder="Deskripsi singkat produk..."
+                                    class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 resize-none"></textarea>
+                            </div>
+                            <div>
+                                <label class="text-xs font-semibold text-gray-400 block mb-1">Spesifikasi Produk</label>
+                                <textarea id="p-specification" rows="3" placeholder="Bahan, teknologi, dll..."
+                                    class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 resize-none"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Variations Input -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Color selection -->
+                            <div>
+                                <div class="flex justify-between items-center mb-2">
+                                    <label class="text-xs font-semibold text-gray-400 uppercase">Warna Produk</label>
+                                    <button type="button" onclick="addColorInput()"
+                                        class="text-xs text-orange-400 hover:text-orange-300 font-semibold">+ Tambah
+                                        Warna</button>
+                                </div>
+                                <div id="p-color-list" class="flex flex-wrap gap-3">
+                                    <div class="color-item relative fade-in flex flex-col items-center gap-0.5">
+                                        <input type="color" value="#000000"
+                                            class="w-12 h-12 rounded-xl cursor-pointer border-2 border-gray-600 hover:border-orange-500 transition-all p-0.5 bg-transparent"
+                                            oninput="this.nextElementSibling.textContent=this.value.toUpperCase()"
+                                            onchange="this.nextElementSibling.textContent=this.value.toUpperCase(); updateVariationMatrix()">
+                                        <span class="text-[9px] text-gray-400 font-mono select-all">#000000</span>
+                                        <button type="button"
+                                            onclick="this.closest('.color-item').remove(); updateVariationMatrix();"
+                                            class="absolute -top-2 -right-2 w-5 h-5 bg-red-600 hover:bg-red-500 rounded-full text-white text-[10px] font-bold flex items-center justify-center shadow-lg border border-red-800 transition-colors">✕</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Size selection -->
+                            <div>
+                                <label class="text-xs font-semibold text-gray-400 uppercase block mb-2">Daftar Ukuran
+                                    (Tekan Enter)</label>
+                                <div
+                                    class="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 flex flex-wrap gap-2 items-center focus-within:border-orange-500 transition-all">
+                                    <div id="p-size-tags" class="flex flex-wrap gap-2"></div>
+                                    <input type="text" id="p-size-input" placeholder="e.g. 40"
+                                        class="flex-1 min-w-[60px] bg-transparent border-none text-sm text-white focus:outline-none"
+                                        onkeydown="if(event.key==='Enter'){event.preventDefault(); addSizeTag(this.value); this.value=''}">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SKU Matrix Table -->
+                        <div id="matrix-section" class="hidden space-y-3">
+                            <div class="flex justify-between items-end border-b border-gray-700 pb-2">
+                                <label class="text-xs font-semibold text-gray-400 uppercase">Konfigurasi Stok & Harga
+                                    Per Variasi</label>
+                                <div
+                                    class="flex gap-3 items-center bg-gray-800/50 p-2 rounded-lg border border-gray-700">
+                                    <span class="text-[10px] text-gray-500 uppercase font-bold">Ubah Semua:</span>
+                                    <input type="text" id="bulk-price" placeholder="Harga"
+                                        class="w-20 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-[10px] text-white">
+                                    <input type="number" id="bulk-stock" placeholder="Stok"
+                                        class="w-16 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-[10px] text-white">
+                                    <button type="button" onclick="applyBulk()"
+                                        class="text-[10px] bg-orange-500 hover:bg-orange-400 text-white px-2 py-1 rounded font-bold transition-all">Terapkan</button>
+                                </div>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm">
+                                    <thead>
+                                        <tr class="text-left border-b border-gray-800">
+                                            <th class="pb-2 text-xs font-bold text-gray-600 uppercase tracking-wider">
+                                                Warna</th>
+                                            <th
+                                                class="pb-2 text-xs font-bold text-gray-600 uppercase tracking-wider pl-2">
+                                                Ukuran</th>
+                                            <th
+                                                class="pb-2 text-xs font-bold text-gray-600 uppercase tracking-wider pl-2">
+                                                Harga (Rp)</th>
+                                            <th
+                                                class="pb-2 text-xs font-bold text-gray-600 uppercase tracking-wider pl-2 text-center w-24">
+                                                Stok</th>
+                                            <th
+                                                class="pb-2 text-xs font-bold text-gray-600 uppercase tracking-wider pr-4 text-right">
+                                                Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sku-matrix-rows"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Direct Gallery Upload UI -->
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="text-xs font-semibold text-gray-400 uppercase block">Unggah Galeri Dasar</label>
+                            </div>
+                            <p class="text-[11px] text-gray-500 italic bg-gray-800/50 p-2 rounded border border-gray-700/50 -mt-1 leading-relaxed">
+                                Upload file di sini akan masuk sebagai Galeri Umum. <br/>Untuk mengatur foto ke <b>Warna Spesifik</b>, simpan produk ini terlebih dahulu, lalu klik tombol <b>Foto</b> di tabel.
+                            </p>
+                            <div id="gallery-upload-zone"
+                                class="border-2 border-dashed border-gray-700 hover:border-orange-500/50 rounded-2xl p-6 transition-all group relative cursor-pointer bg-gray-800/20">
+                                <input type="file" id="p-gallery-input" multiple accept="image/*"
+                                    onchange="handleGalleryInput(this)"
+                                    class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                                <div class="flex flex-col items-center justify-center gap-2 pointer-events-none">
+                                    <div
+                                        class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                        <svg class="w-5 h-5 text-gray-500 group-hover:text-orange-400" fill="none"
+                                            stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                    </div>
+                                    <p class="text-xs font-medium text-gray-400">Pilih beberapa foto sekaligus</p>
+                                    <p class="text-[10px] text-gray-600 italic">Foto pertama akan jadi Thumbnail</p>
+                                </div>
+                            </div>
+                            <div id="p-gallery-preview" class="flex flex-wrap gap-2 empty:hidden py-2">
+                                <!-- Previews will appear here -->
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end pt-2">
+                            <button type="submit"
+                                class="bg-orange-500 hover:bg-orange-400 text-white rounded-xl px-8 py-3 text-sm font-bold shadow-lg shadow-orange-500/20 transition-all active:scale-[0.98] flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 4v16m8-8H4" />
+                                </svg>
+                                Tambah Produk Sekarang
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Search + Filter products -->
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="relative flex-1 min-w-[200px]">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <input type="text" id="products-search" placeholder="Cari nama produk..."
+                            oninput="renderProductsFiltered()"
+                            class="w-full bg-gray-800 border border-gray-700 rounded-xl pl-9 pr-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500">
+                    </div>
+                    <select id="products-category-filter" onchange="renderProductsFiltered()"
+                        class="bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-orange-500 appearance-none cursor-pointer">
+                        <option value="">Semua Kategori</option>
+                    </select>
+                    <button onclick="openCategoryModal()"
+                        class="flex items-center gap-1.5 text-xs text-gray-400 hover:text-orange-400 bg-gray-800 hover:bg-gray-700 border border-gray-700 px-3 py-2 rounded-xl transition-colors font-semibold whitespace-nowrap">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
+                        Kelola Kategori
+                    </button>
+                </div>
+
+                <!-- Products Table -->
+                <div class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr class="border-b border-gray-800">
+                                    <th class="px-4 py-3 w-8"></th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Produk
+                                    </th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                                        Kategori</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Harga
+                                    </th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Total
+                                        Stok</th>
+                                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Aksi
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody id="products-table-body">
+                                <tr>
+                                    <td colspan="6" class="px-5 py-10 text-center text-gray-600 text-sm">Memuat data...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ TAB: USERS ═══ -->
+            <div id="tab-users" class="p-6 space-y-5 hidden">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Manajemen Pengguna</h2>
+                        <p class="text-xs text-gray-500 mt-0.5">Daftar pengguna terdaftar</p>
+                    </div>
+                    <button onclick="fetchUsers()"
+                        class="flex items-center gap-2 text-xs text-orange-400 hover:text-orange-300 font-semibold bg-gray-800 px-3 py-2 rounded-lg border border-gray-700">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+
+                <!-- Users search -->
+                <div class="relative max-w-sm">
+                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" fill="none"
+                        stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input type="text" id="users-search" placeholder="Cari username atau email..."
+                        oninput="renderUsersFiltered()"
+                        class="w-full bg-gray-800 border border-gray-700 rounded-xl pl-9 pr-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500">
+                </div>
+
+                <!-- Stats row -->
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="bg-gray-900 rounded-xl p-4 border border-gray-800">
+                        <p class="text-xs text-gray-500 font-semibold uppercase">Total Pengguna</p>
+                        <p id="user-stat-total" class="text-2xl font-bold text-white mt-1">—</p>
+                    </div>
+                    <div class="bg-gray-900 rounded-xl p-4 border border-gray-800">
+                        <p class="text-xs text-gray-500 font-semibold uppercase">Sudah Pernah Order</p>
+                        <p id="user-stat-ordered" class="text-2xl font-bold text-white mt-1">—</p>
+                    </div>
+                    <div class="bg-gray-900 rounded-xl p-4 border border-gray-800">
+                        <p class="text-xs text-gray-500 font-semibold uppercase">Total Belanja</p>
+                        <p id="user-stat-spent" class="text-2xl font-bold text-white mt-1">—</p>
+                    </div>
+                </div>
+
+                <!-- Users Table -->
+                <div class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr class="border-b border-gray-800">
+                                    <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">ID
+                                    </th>
+                                    <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                                        Username</th>
+                                    <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Email
+                                    </th>
+                                    <th class="px-5 py-3 text-center text-xs font-semibold text-gray-500 uppercase">
+                                        Total Order</th>
+                                    <th class="px-5 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Total
+                                        Belanja</th>
+                                    <th class="px-5 py-3 text-center text-xs font-semibold text-gray-500 uppercase">
+                                        Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-body">
+                                <tr>
+                                    <td colspan="5" class="px-5 py-10 text-center text-gray-600 text-sm">Memuat data...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ TAB: SETTINGS ═══ -->
+            <div id="tab-settings" class="p-6 space-y-6 hidden">
+                <div>
+                    <h2 class="text-lg font-bold text-white">Pengaturan Toko</h2>
+                    <p class="text-xs text-gray-500 mt-0.5">Kelola metode pembayaran dan promo banner</p>
+                </div>
+
+                <!-- Manajemen Banner Slider -->
+                <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden p-5 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-orange-400/10 flex items-center justify-center text-orange-400">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <h3 class="text-sm font-bold text-white">Manajemen Banner Slider (Home)</h3>
+                        </div>
+                        <button onclick="document.getElementById('promo-upload').click()" 
+                                class="bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-3 py-2 rounded-lg transition flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Tambah Banner
+                        </button>
+                        <input type="file" id="promo-upload" class="hidden" accept="image/*" multiple onchange="uploadPromo(this)">
+                    </div>
+                    
+                    <div id="promo-bulk-actions" class="hidden flex items-center justify-between bg-gray-800/50 p-3 rounded-xl border border-gray-700 mb-4 animate-fade-in">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" id="promo-select-all" class="w-4 h-4 rounded bg-gray-700 border-gray-600 text-orange-500 focus:ring-orange-500/20" onchange="toggleSelectAllPromos(this)">
+                            <label for="promo-select-all" class="text-xs font-semibold text-gray-400 cursor-pointer">Pilih Semua</label>
+                        </div>
+                        <button onclick="deleteSelectedPromos()" class="bg-red-900/40 hover:bg-red-700 text-red-500 text-[11px] font-bold px-3 py-1.5 rounded-lg border border-red-800/50 transition flex items-center gap-2">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Hapus Terpilih (<span id="promo-selected-count">0</span>)
+                        </button>
+                    </div>
+
+                    <div id="promo-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        <!-- Promo items rendered here -->
+                        <div class="col-span-full py-10 text-center">
+                            <p class="text-gray-500 text-xs italic">Memuat banner...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- TF BANK INFO -->
+                    <div class="bg-gray-900 rounded-2xl border border-gray-800 p-6 space-y-4 shadow-xl">
+                        <div class="flex items-center gap-2 mb-2">
+                            <div
+                                class="w-8 h-8 bg-orange-500/20 rounded-lg flex items-center justify-center text-orange-500">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                </svg>
+                            </div>
+                            <h3 class="text-sm font-bold text-white uppercase tracking-wide">Informasi Transfer Bank
+                            </h3>
+                        </div>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Nama
+                                    Bank</label>
+                                <input id="tf-bank-name" type="text"
+                                    class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500 transition"
+                                    placeholder="e.g. BCA (Modern Shoes Store)">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Nomor
+                                    Rekening</label>
+                                <input id="tf-account-number" type="text"
+                                    class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500 transition"
+                                    placeholder="e.g. 7712 8890 1234">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Atas
+                                    Nama</label>
+                                <input id="tf-account-holder" type="text"
+                                    class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500 transition"
+                                    placeholder="e.g. PT Shoes Store Modern">
+                            </div>
+                        </div>
+                        <button onclick="saveTfConfig()"
+                            class="w-full mt-2 bg-orange-500 hover:bg-orange-400 text-white text-sm font-bold py-3 rounded-xl shadow-lg shadow-orange-500/20 transition-all active:scale-[0.98]">Simpan
+                            Info Transfer</button>
+                    </div>
+
+                    <!-- QRIS IMAGE -->
+                    <div class="bg-gray-900 rounded-2xl border border-gray-800 p-6 space-y-4 shadow-xl">
+                        <div class="flex items-center gap-2 mb-2">
+                            <div
+                                class="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center text-purple-400">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h2M4 8h2m12 0h2M4 6h4m12 0h2M4 4h4m12 0h2M4 20h4M16 4h4M4 16h4M4 14h4M16 14h4" />
+                                </svg>
+                            </div>
+                            <h3 class="text-sm font-bold text-white uppercase tracking-wide">Metode Pembayaran QRIS</h3>
+                        </div>
+
+                        <div id="qris-current-wrap"
+                            class="hidden text-center bg-gray-800/30 p-4 rounded-2xl border border-gray-800">
+                            <p class="text-[10px] text-gray-500 font-bold uppercase mb-3 tracking-widest text-center">
+                                QRIS Aktif</p>
+                            <img id="qris-current-img"
+                                class="w-40 h-40 mx-auto object-contain rounded-xl border border-gray-700 bg-white"
+                                alt="QRIS">
+                        </div>
+
+                        <div class="space-y-3">
+                            <label class="block cursor-pointer">
+                                <div
+                                    class="flex flex-col items-center justify-center border-2 border-dashed border-gray-700 rounded-2xl p-6 hover:border-purple-500/50 hover:bg-purple-500/5 transition text-gray-500 hover:text-purple-400 group">
+                                    <svg class="w-8 h-8 mb-2 opacity-50 group-hover:opacity-100 transition" fill="none"
+                                        stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                    <span class="text-xs font-semibold">Pilih Foto QRIS Baru</span>
+                                    <p class="text-[10px] opacity-40 mt-1">JPG/PNG/WEBP, Max 5MB</p>
+                                </div>
+                                <input type="file" id="qris-file-input" accept="image/*" class="hidden"
+                                    onchange="previewQris(this)">
+                            </label>
+                            <div id="qris-preview-wrap" class="hidden text-center animate-pulse">
+                                <p class="text-[10px] text-purple-400 font-bold uppercase mb-2">Pratinjau...</p>
+                                <img id="qris-preview-img"
+                                    class="w-40 h-40 mx-auto object-contain rounded-xl border-2 border-purple-500/50 bg-white shadow-lg shadow-purple-500/10">
+                            </div>
+                        </div>
+                        <button onclick="uploadQris()" id="qris-upload-btn" disabled
+                            class="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:grayscale disabled:cursor-not-allowed text-white text-sm font-bold py-3 rounded-xl shadow-lg shadow-purple-500/20 transition-all active:scale-[0.98]">Upload
+                            QRIS Baru</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ TAB: FINANCIAL ═══ -->
+            <div id="tab-financial" class="p-6 space-y-5 hidden">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Laporan Keuangan</h2>
+                        <p class="text-xs text-gray-500 mt-0.5">Pantau pendapatan dan transaksi masuk</p>
+                    </div>
+                    <button onclick="fetchOrders()"
+                        class="flex items-center gap-2 text-xs text-orange-400 hover:text-orange-300 font-semibold bg-gray-800 px-3 py-2 rounded-lg border border-gray-700">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+
+                <div class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr class="border-b border-gray-800 bg-gray-900/80">
+                                    <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
+                                        Tanggal</th>
+                                    <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Order
+                                        ID</th>
+                                    <th class="px-5 py-3 text-right text-xs font-semibold text-gray-500 uppercase">
+                                        Subtotal</th>
+                                    <th class="px-5 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Kode
+                                        Unik</th>
+                                    <th class="px-5 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Total
+                                        Bayar</th>
+                                </tr>
+                            </thead>
+                            <tbody id="financial-table-body">
+                                <tr>
+                                    <td colspan="5" class="px-5 py-10 text-center text-gray-600 text-sm">Memuat data...
+                                    </td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr class="bg-gray-900/50 border-t-2 border-gray-800">
+                                    <td colspan="2" class="px-5 py-4 text-sm font-bold text-gray-300">NET PROFIT (Total
+                                        Subtotal Sukses)</td>
+                                    <td id="financial-net-profit"
+                                        class="px-5 py-4 text-right text-lg font-bold text-green-400">—</td>
+                                    <td colspan="2"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+    </div>
+
+    </main>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+     CATEGORY MANAGER MODAL
+═══════════════════════════════════════════════════════════ -->
+    <div id="category-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div class="bg-gray-800 rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 fade-in border border-gray-700">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-base font-bold">Kelola Kategori</h3>
+                <button onclick="closeCategoryModal()"
+                    class="text-gray-500 hover:text-white text-xl leading-none">&times;</button>
+            </div>
+            <div id="category-list" class="space-y-1.5 max-h-64 overflow-y-auto mb-4"></div>
+            <div class="flex gap-2 pt-3 border-t border-gray-700">
+                <input type="text" id="new-cat-input" placeholder="Nama kategori baru..."
+                    class="flex-1 bg-gray-700 border border-gray-600 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+                    onkeydown="if(event.key==='Enter') addCategoryFromModal()">
+                <button onclick="addCategoryFromModal()"
+                    class="px-4 py-2 bg-orange-500 hover:bg-orange-400 rounded-xl text-sm font-bold text-white transition-colors">Tambah</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════════════════════ -->
+    <script src="admin.js"></script>
+</body>
+
+</html>

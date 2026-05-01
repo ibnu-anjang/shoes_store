@@ -1,0 +1,20 @@
+# Development override — jalankan dengan:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Keunggulan vs docker-compose.yml biasa:
+#   - Kode Python di-mount langsung (tidak perlu rebuild saat edit)
+#   - Uvicorn jalan dengan --reload (restart otomatis saat ada perubahan file)
+#   - Cloudflare tunnel & phpMyAdmin tetap aktif
+
+services:
+  app:
+    # Override CMD agar pakai --reload (hot-reload)
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
+    volumes:
+      # Mount source code langsung → edit file = langsung efektif tanpa rebuild
+      - ./backend/app:/app/app
+      - ./backend/admin_panel:/app/admin_panel
+      - ./backend/uploads:/app/uploads
+    environment:
+      # Aktifkan log level lebih detail saat development
+      LOG_LEVEL: debug
